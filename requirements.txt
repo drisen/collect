@@ -1,0 +1,13 @@
+boto3>=1.21
+-e ..\\awslib
+-e ..\\credentials
+-e ..\\cpiapi
+pytz>=2022.1    # due to -e cpiapi
+requests        # due to -e cpiapi
+urllib3         # due to -e cpiapi
+-e ..\\loom     # due to -e cpiapi
+-e ..\\timeMachine
+# the following seems syntactically correct, but fails to launch a browser to login to github
+# credentials @ git+https://github.com/drisen/credentials.git@v1.0
+# the following absolute file reference works, but would prefer a relative reference
+# cpiapi @ file:///G:/My%20Drive/Case/PyCharm/cpiapi

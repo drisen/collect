@@ -1,0 +1,29 @@
+# This file is /usr/lib/systemd/system/ncsstats.service
+[Unit]
+Description=Collect statistics from Cisco Prime Infrastructure
+#Documentation= http://...
+Requires=multi-user.target network-online.target
+After=multi-user.target network-online.target
+RequiresMountsFor= /usr /fs1
+#OnFailure=
+
+[Service]
+User=dar5
+Group=games
+Type=forking
+NotifyAccess=all
+Environment="PYTHONPATH=/fs1/ncsstats/bin"
+WorkingDirectory=/fs1/ncsstats
+PIDfile=/fs1/ncsstats/collect/pid
+
+ExecStart=/usr/bin/python3 /fs1/ncsstats/bin/collect.py --START
+ExecReload=/usr/bin/python3 /fs1/ncsstats/bin/collect.py --RELOAD
+ExecStop=/usr/bin/python3 /fs1/ncsstats/bin/collect.py --STOP
+RestartSec=300
+Restart=always
+#TimeoutStartSec=10
+#TimeoutStopSec=300
+#WatchdogSec=1200
+Restart=on-failure
+
+[Install]
