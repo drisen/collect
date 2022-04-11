@@ -3,8 +3,8 @@
 #
 """
 Polls the CPI ClientDetails API in real-time, writing its most significant fields
-to time-stamped NNNNNNNNNN_ClientDetailsv4.csv files in the collect_cd sub-directory.
-It starts a new file every N hours, and keeps a collection status in collect_cd.json
+to time-stamped NNNNNNNNNN_ClientBriefv4.csv files in the ./collect_cd directory.
+Every N hours, close and move the file to ./files and keeps a collection status in collect_cd.json
 to facilitate appending only the new polls.
 """
 
@@ -17,12 +17,15 @@ import time
 
 import cpiapi
 from credentials import credentials
+"""To Do
+
+"""
 
 mac_state = dict() 			# {mac: most recent record, ...}
 
 
 def write_state(file_name: str, tables: dict):
-    """Writes all table's dynamic state variables to a JSON file
+    """Writes all tables' dynamic state variables to a JSON file
 
     Parameters:
         file_name (str):	file_name to write JSON-encoded state

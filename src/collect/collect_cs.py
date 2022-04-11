@@ -15,6 +15,10 @@ import time
 
 import cpiapi
 from credentials import credentials
+""" To Do
+- Fix the poller. After an initial read through 8 x 1000001 records, it repeatedly
+sleeps 299 seconds and reads nothing
+"""
 
 
 def write_state(file_name: str, tables: dict):

@@ -17,9 +17,9 @@ into a single nnn_tablename.csv file and deletes the nnn_tablename.parts.
 path = 'files'							# (relative) path to collect output
 dir_pat = re.compile(r"([0-9]+)_([a-z]+)(v[0-9])?((_[a-z]+)*)", flags=re.IGNORECASE)
 
-file_list = listdir(path)				# list the files
 # cleanup directories from failed aggregation of parts
-dirs_list = [fn for fn in file_list if re.fullmatch(dir_pat, fn) and isdir(join(path, fn))]
+dirs_list = [fn for fn in listdir(path)
+             if re.fullmatch(dir_pat, fn) and isdir(join(path, fn))]
 for file_name in dirs_list:				# incomplete parts processing
     in_path = join(path, file_name)  	# path to this directory
     print(f"Recovering incomplete processing of {in_path} directory.")
@@ -45,10 +45,9 @@ for file_name in dirs_list:				# incomplete parts processing
 # aggregate .part files
 file_pat = re.compile(r"([0-9]+)_([a-z]+)(v[0-9])?((_[a-z]+)*)(\.part)",
                     flags=re.IGNORECASE)
-file_list = listdir(path)			# list the files in the output of collect ...
 # parts_list = [fn for fn in file_list if fn[-5:] == '.part']  # ... that are '.part'
-parts_dict = defaultdict(list)  # Dict(1, [])  # {Table_name+version+SubTable_name: [timestamp, ...}
-for file_name in file_list:			# list of files in collect's output directory
+parts_dict = defaultdict(list)  # {Table_name+version+SubTable_name: [timestamp, ...}
+for file_name in listdir(path):			# list of files in collect's output directory
     m = re.fullmatch(file_pat, file_name)
     if m:								# a .part file from collect?
         table_name = m.group(2)+m.group(3)+m.group(4)  # [Sub]Table name, w/o stamp

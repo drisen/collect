@@ -20,6 +20,7 @@ It starts a new file every N hours, and keeps a collection status in collect_cs.
 to facilitate appending only the new polls.
 - **compare.py** Compares the results of parallel operation of collect.py for
 regression testing.
+- **neighbors.py** For each AP slot, report the co-channel noise from neighboring APs
 - **parts.py** Aggregates multiple nnn_tablename.part files produced by collect_c[ds]
 into a single nnn_tablename.csv file and deletes the nnn_tablename.parts.
 - **tracker** Uses ClientSessions join ClientDetails API real-time data collection of client
