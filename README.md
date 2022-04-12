@@ -23,11 +23,16 @@ regression testing.
 - **neighbors.py** For each AP slot, report the co-channel noise from neighboring APs
 - **parts.py** Aggregates multiple nnn_tablename.part files produced by collect_c[ds]
 into a single nnn_tablename.csv file and deletes the nnn_tablename.parts.
+- **realtime.py** The service-provider layer for application(s) that provide realtime
+advice based on the number of people (actually client devices) in a Wi-Fi
+cell zone.
+- **sessions** Report the clientSessions for client associations with 
+APs during time window
 - **tracker** Uses ClientSessions join ClientDetails API real-time data collection of client
 device associations to APs stored in AWS S3 to calculate estimated
 [infection] exposure risks by AP cell and individual user.
 Writes a csv report of the top risks by location and user.
-Assists exposure tracking by producing a report of an individual users
+Assists exposure tracking by producing a report of an individual users'
 location over time.
 
 
