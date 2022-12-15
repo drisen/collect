@@ -68,6 +68,9 @@ track_macs = defaultdict(float)  # dict(1, 0.0) 	# {client_mac: p} for each clie
 
 
 class L1r:
+    """
+    Left to Right Look-ahead 1 iterable
+    """
     def __init__(self, reader: callable, **kwargs):
         """Look-ahead 1 iterable.
 

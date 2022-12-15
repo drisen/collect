@@ -1,6 +1,10 @@
 #!/usr/bin/python3
 # parts.py Copyright (C) 2020 Dennis Risen, Case Western Reserve University
 #
+"""
+Aggregates multiple nnn_tablename.part files produced by collect_c[ds]
+into a single nnn_tablename.csv file and deletes the nnn_tablename.parts.
+"""
 
 from collections import defaultdict
 from cpiapi import logErr
@@ -8,11 +12,6 @@ from os import listdir, mkdir, remove, rename, rmdir
 from os.path import isdir, join
 import re
 from typing import Union
-
-"""
-Aggregates multiple nnn_tablename.part files produced by collect_c[ds]
-into a single nnn_tablename.csv file and deletes the nnn_tablename.parts.
-"""
 
 path = 'files'							# (relative) path to collect output
 dir_pat = re.compile(r"([0-9]+)_([a-z]+)(v[0-9])?((_[a-z]+)*)", flags=re.IGNORECASE)

@@ -2,6 +2,9 @@
 # sessions.py Copyright (C) 2020 by Dennis Risen, Case Western Reserve University
 #
 
+"""
+Report the clientSessions for client associations with APs during time window
+"""
 import csv
 import os.path
 import sys
@@ -90,6 +93,11 @@ def collect(tablename: str, filters: dict, cumulatives: Sequence,
 
 
 def clientMac(rec):
+    """Return rec['macAddress']['octets'] or raise KeyError if it is not in clients
+
+    :param rec:
+    :return:
+    """
     mac = rec['macAddress']['octets']
     if mac in clients:
         return mac
@@ -97,6 +105,11 @@ def clientMac(rec):
 
 
 def keyApMac(rec):
+    """Transform rec[key] to mac address w/o colons. extend rec with 'apName' from APDMAC[mac]
+
+    :param rec:
+    :return:
+    """
     mac = rec['key'].replace(':', '')  	# key has colons, but APDMAC does not
     if mac in ap_macs:
         apdmac = APDMAC[mac]
@@ -106,6 +119,11 @@ def keyApMac(rec):
 
 
 def apMac(rec):
+    """extend rec with 'apName' from APDMAC[mac address]
+
+    :param rec:
+    :return:
+    """
     mac = rec['macAddress']['octets'] 	# macAddress_octets does not have punctuation
     if mac in ap_macs:
         apdmac = APDMAC[mac]

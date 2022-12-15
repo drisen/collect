@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2021 Dennis Risen, Case Western Reserve University
+# collect_cs.py Copyright (C) 2021 Dennis Risen, Case Western Reserve University
 #
 """
 Polls the CPI ClientSessions API in real-time, writing its most significant fields

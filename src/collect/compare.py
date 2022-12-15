@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Dennis Risen, Case Western Reserve University
+# compare.py Copyright (C) 2020 Dennis Risen, Case Western Reserve University
 #
 """
 Compares parallel production, e.g. from different versions, in 'files' and 'prod' directories

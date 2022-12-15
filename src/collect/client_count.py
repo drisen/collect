@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# client_count Copyright (C) 2020 Dennis Risen, Case Western Reserve University
+# client_count.py Copyright (C) 2020 Dennis Risen, Case Western Reserve University
 #
 """
 Produce csv reports, apClientCountsAuthYYYY-MM-DD and apClientCountsTotYYYY-MM-DD
@@ -45,6 +45,9 @@ polled_pat = r'([^/]+/)+([0-9]+)_[^/]+'  # group(2) is polledTime from filename
 
 
 class TimedTable:
+    """Replacement for, or shi to, the TimeMachine
+
+    """
     my_cpi: cpiapi.Cpi = None
     expire_age = 5 * day_secs*1000      #
 
@@ -120,10 +123,19 @@ class TimedTable:
                 print(f"Deleted {del_count} old records")
 
     def values(self):
+        """Return the map values
+
+        :return:
+        """
         return self.tm.values()
 
 
 def siteName2locH(name: str) -> str:
+    """Translate a siteName to location hierarchy by replacing '/' with ' > '
+
+    :param name: siteName string
+    :return:    locationHierarchy name
+    """
     # 23 == len('Location/All Locations/')
     return name[23:].replace('/', ' > ')
 
@@ -310,6 +322,11 @@ if from_aws:  							# reading range of days from AWS?
                                                      verbose_1(args.verbose))]
 
     def apMac(row) -> str:  			# get the mac_address_octets field
+        """return row['macAddress_octets']
+        
+        :param row: 
+        :return: 
+        """
         return row['macAddress_octets']  # from pre-processed AccessPointDetails record
 
 else:  # No. Reading from collect's local files
@@ -333,6 +350,11 @@ else:  # No. Reading from collect's local files
     # sites_reader = Cpi.Reader(my_cpi, 'v4/op/groups/sites')
 
     def apMac(row: dict) -> str:  		# get the macAddress_octets field
+        """return row['macAddress']['octets']
+        
+        :param row: 
+        :return: 
+        """
         return row['macAddress']['octets']  # from raw AccessPointDetails API record
 
     # get a directory list of files compressed yesterday noon

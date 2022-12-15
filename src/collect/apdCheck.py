@@ -2,6 +2,10 @@
 #
 # apdCheck.py Copyright (C) 2018 Dennis Risen, Case Western Reserve University
 #
+"""
+Read access point definitions from AccessPointDetails API, and check
+for syntactically valid mapLocation information
+"""
 
 from argparse import ArgumentParser
 import re

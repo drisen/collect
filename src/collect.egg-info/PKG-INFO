@@ -1,3 +1,20 @@
+Metadata-Version: 2.1
+Name: collect
+Version: 2.0.2
+Summary: "Applications to collect and report statistics from the CPI APIs"
+Home-page: https://github.com/drisen/collect
+Author: "Dennis Risen"
+Author-email: "dar5@case.edu"
+License: UNKNOWN
+Project-URL: Bug Tracker, https://github.com/drisen/collect/issues
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: Licence :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
 # collect package
 Applications that collect and process statistics from CPI
 - **apdCheck.py** Read access point definitions from AccessPointDetails API,
@@ -34,5 +51,7 @@ device associations to APs stored in AWS S3 to calculate estimated
 Writes a csv report of the top risks by location and user.
 Assists exposure tracking by producing a report of an individual users'
 location over time.
+
+
 
 

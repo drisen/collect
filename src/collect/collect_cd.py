@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-# Copyright (C) 2021 Dennis Risen, Case Western Reserve University
+# collect_cd.py Copyright (C) 2021 Dennis Risen, Case Western Reserve University
 #
 """
 Polls the CPI ClientDetails API in real-time, writing its most significant fields
@@ -145,9 +145,13 @@ while True:								# loop forever
                     rec_cnt += 1
                     mac_state[mac] = rec
                     writer.writerow(rec)
-            except ConnectionAbortedError:
+            except ConnectionAbortedError as ce:
                 # new CPI version returns ConnectionAbortedError when there are no records?
-                print("ConnectionAbortedError")
+                print(f"ConnectionAbortedError {ce}")
+            except ConnectionError as ce:
+                # Haven't been able to connect for the last (timeout+240)*(1+2+4+8+16) seconds
+                print(f"ConnectionError {ce}")
+                # just keep waiting for CPI to become available
             outfile.flush()
             print(f"{cpiapi.strfTime(float(poll_time))} {dupl_cnt} duplicate and {rec_cnt} new records")
             write_state('collect_cd.json', {'ClientDetails': [tbl]})
