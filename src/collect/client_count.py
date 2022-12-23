@@ -39,13 +39,13 @@ csv_path = 'files'  # directory for collect's output files from after noon yeste
 gz_path = 'files/copied'  # directory for files copied and compressed noon yesterday
 do_not_backup = 'C:/Users/dar5/Downloads/DoNotBackup/'
 tm_path = do_not_backup + 'awsstuff/prod'  # path to timeMachines
-day_secs = 24 * 60 * 60  		# number of seconds in a day
+day_secs = 24 * 60 * 60  	        # number of seconds in a day
 tol = 5  					# allowable time offset between collectionTimes in a sample
 polled_pat = r'([^/]+/)+([0-9]+)_[^/]+'  # group(2) is polledTime from filename
 
 
 class TimedTable:
-    """Replacement for, or shi to, the TimeMachine
+    """Replacement for, or shim to, the TimeMachine
 
     """
     my_cpi: cpiapi.Cpi = None

@@ -4,7 +4,7 @@
 """
 Polls the CPI ClientDetails API in real-time, writing its most significant fields
 to time-stamped NNNNNNNNNN_ClientBriefv4.csv files in the ./collect_cd directory.
-Every N hours, close and move the file to ./files and keeps a collection status in collect_cd.json
+Every N hours, close and move the file to ./files and keep a collection status in collect_cd.json
 to facilitate appending only the new polls.
 """
 

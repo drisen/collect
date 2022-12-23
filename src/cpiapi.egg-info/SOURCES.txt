@@ -1,8 +1,0 @@
-LICENSE
-README.md
-pyproject.toml
-setup.cfg
-src/cpiapi.egg-info/PKG-INFO
-src/cpiapi.egg-info/SOURCES.txt
-src/cpiapi.egg-info/dependency_links.txt
-src/cpiapi.egg-info/top_level.txt

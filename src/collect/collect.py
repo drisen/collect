@@ -2,6 +2,10 @@
 #
 # collect.py Copyright (C) 2019 Dennis Risen, Case Western Reserve University
 #
+"""
+Continuously collect statistics from CPI APIs on the API
+definitions listed in cpiapi.production and write each sample to ./files
+"""
 from argparse import ArgumentParser
 from collections import defaultdict
 import json
@@ -10,7 +14,7 @@ import os
 import sys
 import threading
 from time import sleep, time
-from typing import Union
+from typing import Dict, Union
 
 from cpiapi import add_table, all_table_dicts, allTypes, anyToSecs, \
     Cpi, date_bad, find_table, logErr, Pager, printIf, production, \
@@ -19,6 +23,7 @@ from credentials import credentials
 
 TAU = 20 			# time-constant for recordsPerHour learning. Samples or Days
 """ To do
+- Save to collect.json whenever scheduler sleeps
 - ClientSessions unknown field sessionTime has 1 int
 - ClientSessions.authorizationPolicy has no data
 - in HistoricalRF*, the collectionTime is corrected and output in csv with +0400 offset.
@@ -31,7 +36,6 @@ TAU = 20 			# time-constant for recordsPerHour learning. Samples or Days
 - When Cisco has fixed UTC zone formatting, remove DateBad correction in flatten() 
 - change dar5 password on ncs01
 - install certificate(s)
-- Write a test daemon, then configure this as a daemon
 - Write report for correct data in op/group/sites
 - when ingesting into the data lake
     create username table (UID, username) and allow access only to the UID
@@ -41,6 +45,8 @@ TAU = 20 			# time-constant for recordsPerHour learning. Samples or Days
 Not to do
 - report fields with total count != recCnt
 - csPager add polling in the danger zone
+- Write a test daemon, then configure this as a daemon
+
 
 """
 
@@ -207,14 +213,17 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
                         lastTime = flat[tbl.timeField]  # remember last value
                 try:
                     tbl.writer.writerow(flat)
-                except (UnicodeError, UnicodeEncodeError): 	# csv's strict decode to ascii failed
+                except (UnicodeError, UnicodeEncodeError): 	# csv's strict decode to ASCII failed
                     for fld in flat: 	# convert str to ascii w/ backslash where necessary
                         if isinstance(flat[fld], str):
                             flat[fld] = flat[fld].encode('utf-8').decode('ascii', 'backslashreplace')
                     tbl.writer.writerow(flat)
                 check_fields(tbl, flat)
         except (ConnectionAbortedError, ConnectionError, ConnectionRefusedError) as e:
-            success = False  # collection failed. Will close, but not rename output
+            # ClientDetails API spuriously returns a 500 error code that stops the collection.
+            # However, the data to this point is good. Accept the data as OK and move on.
+            if not (tbl.tableName == 'ClientDetails' and tbl.recCnt > 0):  # ***** when Cisco fixes
+                success = False  # collection failed. Will close, but not rename output
             logErr(f"{my_name}{e} reading {tbl.tableName}")
             tbl.nextPoll = time() + 4*60*60  # wait 4 hours before trying again
         if real_time:					# Am I the priority collector?

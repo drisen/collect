@@ -13,7 +13,9 @@ import re
 import time
 
 import cpiapi
-
+""" To Do
+Extend to handle more 6GHz too
+"""
 
 # {macAddress: {'apMacAddress: {apMacAddress: cnt}, ...},
 # 'protocol': {protocol: cnt, ...},

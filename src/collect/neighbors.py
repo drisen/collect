@@ -3,8 +3,6 @@
 # neighbors.py Copyright (C) 2019 by Dennis Risen, Case Western Reserve University
 #
 """ To Do
-Many radios have UNKNOWN channel. Just ignore these?
-Many radios have
 """
 import csv
 import math
@@ -12,6 +10,7 @@ from argparse import ArgumentParser
 import re
 import sys
 from time import time
+from typing import Union
 
 from cpiapi import all_table_dicts, Cpi, Cache, printIf, secsToMillis, strfTime, verbose_1
 from credentials import credentials
@@ -24,8 +23,8 @@ for i in range(149, 165):
 pairs[165] = 165
 
 
-def dBm(mwatt: float) -> int:
-    """Convert mwatt to dbm."""
+def dBm(mwatt: float) -> Union[int, float]:
+    """Convert mwatt to int dbm. Returns NaN when out of range for an int"""
     try:
         return int(10*math.log10(mwatt))
     except ValueError:
@@ -53,7 +52,7 @@ def select(source: dict, *fields) -> dict:
 
 
 def mwatt(dbm: int) -> float:
-    """Convert dbm to mwatt."""
+    """Convert int dbm to mwatt."""
     return math.pow(10.0, dbm / 10.0)
 
 
@@ -70,7 +69,7 @@ parser.add_argument('--allchannels', action='store_true', default=False,
 parser.add_argument('--band', action='store',
                     choices=('2.4', '5.0', 'both'), default='5.0',
                     help="band to analyze: 2.4, 5.0 or both (default=5.0)")
-parser.add_argument('--cache', action='store', type=float, default=None,
+parser.add_argument('--cache', action='store', type=float, default=5.0,
                     const=0.0, nargs='?',
                     help='Obtain rxNeighbors poll from the cache, with optional age to accept')
 parser.add_argument('--csv', action='store_true', default=False,
@@ -181,11 +180,11 @@ for rec in reader:
         continue					    # ignore duplicate
     APById[AP['@id']] = AP
     APByMac[macAddress_octets] = AP
-    # Count radio models by filtered AP name
     nameSplit = AP['name'].upper().split('-')
     bldg = nameSplit[0] if len(nameSplit) > 1 else 'other'
     if name_regex is not None and not name_regex.match(bldg):
         continue		    # AP will not be reported. Don't include in model counts
+    # Count radio models by filtered AP name
     m = re.fullmatch(r'AIR-[CL]?AP(.*)-K9', rec['model'])
     model = m.group(1)[:(5 if args.full else 4)] + m.group(1)[-2:] if m else rec['model']
     try:
@@ -207,7 +206,7 @@ for rec in reader:
         print(f"RadioDetails.baseRadioMac={baseRadioMac} not in APD. Radio ignored.")
         continue					    # Yes, ignore this record
     if rec['apName'] != AP['name']: 	# AP name mismatch?
-        print(f"RadioDetail.apName={rec['apName']}!=APD.name={AP['name']}. Using the name in APD.")
+        print(f"RadioDetails.apName={rec['apName']}!=APD.name={AP['name']}.")
     # create information for this radio
     radio = select(rec, 'channelWidth', 'powerLevel', 'slotId')
     channelNumber = rec.get('channelNumber', None)
@@ -218,7 +217,9 @@ for rec in reader:
         try:					    # convert channelNumber:str to channelNumber:int
             channelNumber = int(channelNumber[1:])  # skip over leading '_'
         except ValueError:
-            print(f"{rec['apName']} bad RadioDetails.channelNumber={channelNumber}")
+            if not (AP['model'].startswith('C9120AX') and radio['slotId'] == 6 and rec['radioType'] == 'Unknown'):
+                print(f"{rec['apName']}.{radio['slotId']} {rec['radioType']} {rec['radioRole']} "
+                      + f"is {AP['model']} w/bad RadioDetails.channelNumber={channelNumber}")
             continue                    # ignore this radio
     slotId = radio['slotId']
     radio['channelNumber'] = channelNumber
@@ -300,42 +301,49 @@ else:
     print(f"Can't find definition for rxNeighbors CPI table")
     sys.exit(1)
 
-if args.neighbors is None:
-    out = None
+if args.neighbors is not None:  # supplied output file for noise & neighbor RSSI?
+    out = open(args.neighbors, 'w')     # open report file
 else:
-    out = open(args.neighbors, 'w')
+    out = None                          # no output will be produced
 
 if args.maxConcurrent is not None:
-    myCpi.maxConcurrent = args.maxConcurrent
+    myCpi.maxConcurrent = args.maxConcurrent  # override default
 printIf(args.verbose, "processing rxNeighbors")
 nowMsec = secsToMillis(time())
+# initialize reader to read from file, cache, or CPI
 if args.infile is not None:		        # input file specified?
     # Obtain rxNeighbors table from csv file
     infile = open(args.infile, 'r', newline='')
     reader = csv.DictReader(infile)
-    sourceMsec = None				    # initially don't know polledTime
+    sourceMsec = None				    # polledTime is initially unknown
+    printIf(args.verbose, f"Reading rxNeighbors data from {args.infile}")
 elif args.cache and args.cache > 0.0:   # OK to use cached data
-    infile = None
-    reader = Cache.Reader(myCpi, tbl, age=args.cache, verbose=args.verbose)
+    infile = None                       # keep IDE happy
+    reader = Cache.Reader(myCpi, tbl, age=args.cache, verbose=args.verbose, name_regex=name_regex)
     tbl.errorList = []                  # no errors it we don't actually GET from CPI
-    sourceMsec = None
+    sourceMsec = None                   # polledTime is initially unknown
+    printIf(args.verbose, f"Reading rxNeighbors data from cache, if available")
 else:								    # Obtain rxNeighbors directly from CPI
-    infile = None
+    infile = None                       # keep IDE happy
     reader = tbl.generator(myCpi, tbl, verbose=verbose_1(args.verbose),
                            name_regex=name_regex)
-    sourceMsec = nowMsec
+    sourceMsec = nowMsec                # polledTime is now
+    printIf(args.verbose, f"Reading rxNeighbors data from CPI via generator")
 
-rxwriter: csv.DictWriter = None
+# initialize rxWriter to write raw rxNeighbors detail to csv file
+rxWriter: Union[csv.DictWriter, None]
 if args.outfile is not None:		    # requested rxNeighbors output csv file?
     outfile = open(args.outfile, 'w', newline='')
-    rxwriter = csv.DictWriter(outfile, fieldnames=tbl.select, restval='', extrasaction='ignore')
-    rxwriter.writeheader()
+    rxWriter = csv.DictWriter(outfile, fieldnames=tbl.select, restval='', extrasaction='ignore')
+    rxWriter.writeheader()
 else:
-    outfile = None
-rec_cnt = 0
+    outfile = None                      # No. No csv file will be written
+
+# read and process al rxNeighbor records from requested source
+rec_cnt = 0             # number of records read so far, for diagnostic messages
 for row in reader:
-    if args.infile is None:		        # reading from cpi?
-        # Yes. Flatten fields
+    if args.infile is None:		        # reading directly from CPI API?
+        #                               Yes. Flatten fields to canonic csv form
         row['macAddress_octets'] = row['macAddress']['octets']
         del row['macAddress']
         row['neighborIpAddress_address'] = row['neighborIpAddress']['address']
@@ -343,37 +351,45 @@ for row in reader:
         row['polledTime'] = nowMsec
     if sourceMsec is None:			    # sourceMsec unknown?
         sourceMsec = int(row['polledTime'])  # remember the polledTime of the source
-    if outfile is not None:
-        rxwriter.writerow(row)
+    if outfile is not None:             # writing raw rxNeighbors data to csv?
+        rxWriter.writerow(row)          # Yes
     rec_cnt += 1
     if args.verbose > 0 and rec_cnt % 1000 == 0:
         print(f"{rec_cnt:4} records")
 
-    neighbor = dict()				    # construct here
-    # CPI returns correct type, but DictReader returns each field as string
-    apId = int(row['apId'])
+    neighbor = dict()				    # neighbor constructed here
+    # Ensure that fields are correctly type-cast
+    apId = int(row['apId'])             # polled access point' Id
+    slotId = int(row['slotId'])  # polled access point's radio slotId reporting this neighbor
     macAddress_octets = row['macAddress_octets']  # AP's base MAC
     neighbor['ApId'] = neighborApId = int(row['neighborApId'])
     neighbor['ApName'] = neighborApName = row['neighborApName']
     neighbor['Channel'] = neighborChannel = int(row['neighborChannel'])
     neighbor['RSSI'] = neighborRSSI = int(row['neighborRSSI'])
     neighbor['slotId'] = neighborSlotId = int(row['neighborSlotId'])
-    slotId = int(row['slotId'])
-    AP = APById.get(apId, None)		    # AP structure for AP
+    AP = APById.get(apId, None)		    # get AP reported by AccessPointDetails API
     if AP is None:					    # Unknown apId?
-        print(f"Unknown apId={apId} with neighbor={neighborApName} on channel={neighborChannel}. Ignored.")
-        continue
+        print(f"Unknown apId={apId} hears neighbor={neighborApName} "
+              + f"on channel={neighborChannel} at {neighborRSSI}dBm.")
+        continue                        # ignore record.
+    if not re.search(name_regex, AP['name']):  # AP name was not requested?
+        print(f"Unrequested {AP['name']} w/apId={apId} hears neighbor={neighborApName} "
+              + f"on channel={neighborChannel} at {neighborRSSI}dBm.")
+        continue                        # ignore record.
     if macAddress_octets != AP['macAddress_octets']: 	# bad MAC?
-        print(f"rxNeighbors.macAddress_octets={macAddress_octets}!={AP['macAddress_octets']}"
-            + f"=APByMac[{apId}].APD.macAddress_octets. Ignored.")
+        print(f"rxNeighbors {neighborApName}'s macAddress_octets={macAddress_octets}!={AP['macAddress_octets']}"
+            + f"=APByMac[{apId}].APD.macAddress_octets for {AP['name']}")
         continue					    # ignore mis-correlated data
     radio = AP['radios'].get(slotId, None)  # AP's radio for this slot
     if radio is None:
-        print(f"{AP['name']} slot {slotId} not defined in RadioDetails, but has a neighbor")
-    try:							    # neighbor radio
+        print(f"{AP['name']} slot {slotId} is not defined in RadioDetails, but hears "
+              + f"neighbor {neighborApName} slotId {neighborSlotId} at {neighborRSSI}dBm")
+        continue
+    try:							    # lookup neighbor radio's RadioDetails
         neighborRadio = APById[neighborApId]['radios'][neighborSlotId]
     except KeyError:
-        print(f"Couldn't find neighborApId={neighborApId} radio{neighborSlotId}. Ignored.")
+        print(f"{AP['name']} slot{slotId}  hears unknown {neighborApName} w/ApId={neighborApId} "
+              + f"slot{neighborSlotId} at {neighborRSSI}dBm.")
         continue
     channelNumber = map_chan(radio['channelNumber'])
     neighborChannel = map_chan(neighborChannel)
@@ -394,12 +410,13 @@ if args.infile is not None:		        # reading from infile
     names = ''
     unreachable = ''
 else:								    # reading from CPI
-    unreachable = {id for id in APById if APById[id]['reachabilityStatus'] != 'REACHABLE'}
+    unreachable = {id for id in APById if re.search(name_regex, APById[id]['name'])
+                   and APById[id]['reachabilityStatus'] != 'REACHABLE'}
     names = ', '.join(sorted((APById[id]['name'] if id in APById else 'Unknown')
                              for id in tbl.errorList if id not in unreachable))
     unreachable = ', '.join(sorted(APById[id]['name'] for id in unreachable))
     if len(unreachable) > 0:
-        print(f"APs {unreachable} were unreachable")
+        print(f"APs with reachabilityStatus!='REACHABLE': {unreachable}")
     if len(names) > 0:
         print(f"APs {names} didn't return neighbor status")
 if outfile is not None:

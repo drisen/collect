@@ -47,50 +47,69 @@ def load_apd(report: bool) -> dict:
 """
     last_std_fields = ''
 
-    def report_err(name: str):
-        """Print "name" problem code and AP info. Incr "name" problem count"""
+    def report_err(problemName: str):
+        """Increment problem count for problemCode. Print problemCode and AP info.
+
+        :param problemName:     problem name
+        """
         nonlocal last_std_fields
-        report_txt[name]['cnt'] += 1
-        if name in omit_detail:
-            return
-        if report and last_std_fields == std_fields:  # Same AP?
-            print(f"{report_txt[name]['name']:13}")  # just output problem
-        elif report:  					# different AP
-            print(f"{report_txt[name]['name']:13} {std_fields}")  # full output
-        else:
-            pass
-        last_std_fields = std_fields  	# remember last, for simplified output
+        report_txt[problemName]['count'] += 1  # always increment count of this problem
+        if problemName in omit_detail:  # listing of each instance turned off?
+            return                      # Yes. return w/o printing the instance
+        if not report:                  # report not requested
+            return                        # Yes. skip reporting
+        if last_std_fields == std_fields:  # Same AP as last report_err?
+            print(f"{report_txt[problemName]['name']:13} in above")  # Yes. Just output problemName
+        else:                           # No. different AP
+            print(f"{report_txt[problemName]['name']:13} {std_fields}")  # full output
+        last_std_fields = std_fields  	# remember last, for above output
 
     def build_dict(result: dict, *entries):
+        """Return a dictionary of the entries in result
+
+        :param result:      build the dictionary here
+        :param entries:     each entry of the form (problemName, brief description, full description)
+        :return: dict of the form {problemName: {
+        """
         """Add a problem entry to result for each entry tuple."""
         for name, brief, full in entries:
-            result[name] = {"cnt": 0, "name": brief, "full": full}
+            result[name] = {"count": 0, "name": brief, "full": full}
+
+    # loose syntax of faceplate to match on common errors too
+    separators = r'|'  					# Allow only pipe as a mapLocation field separator
+    faceplate_re = r'[0-9]{2,3}-[0-9]{2}-[bB]?[0-9]{1,2}-[sS]{0,1}[0-9]{0,3}[-[a-zA-Z0-9][0-9]*]?'
+    mac_re = r'([0-9A-Fa-f][0-9A-Fa-f]:){5}[0-9A-Fa-f]{2},?'  # macAddress with colons pattern
+    # was r'([a-zA-Z]-)?[a-zA-Z0-9]+-[mMpP][0-9]+-[O]?[wW][0-9]+(-(OW|R|RW)[0-9]{2})?'
+    outdoor = '((MatherQuad|CaseQuad|nash|nrv|SouthRes)-)'
+    name_pat = outdoor + r'?[a-zA-Z0-9_]+-[mMpP][0-9]+-[O]?[wW][0-9]+(-(OW|R|RW)[0-9]{2})*'
+    leading_faceplate_re = '^' + faceplate_re + ' '
 
     # error counters and their text
     report_txt = dict()
-    build_dict(report_txt, ("questioned", "question mark", "APs with a question-mark in the mapLocation."),
-               ("noFaceplate", "No faceplate", "APs w/o a faceplate number"),
-               ("macAdd", "MAC in Loc.", "MAC addresses in the mapLocation."),
-               ("apnamesyntax", "name syntax", "APs with bad name syntax."),
-               ("unassigned", "no CPI map", 'APs not in CPI maps and mapLocation="default location". Dropped.'),
+    build_dict(report_txt, ("questioned", "question mark",
+                            "APs with a question-mark in the mapLocation."),
+               ("noFaceplate", "No faceplate",
+                "APs w/o a faceplate matching:" + faceplate_re),
+               ("macAdd", "MAC in Loc.", "MAC addresse(s) in the mapLocation."),
+               ("apnamesyntax", "name syntax", "AP name doesn't match:" + name_pat),
+               ("unassigned", "no CPI map",
+                'APs not in CPI maps and mapLocation="default location".'),
                ("noloc", "No floor loc",
-                'APs with mapLocation="default location". Set mapLocation = Building > Floor.'),
-               ("manset", "Loc & not Map", "APs not in CPI maps, but manually assigned a mapLocation."),
-               ("hasComma", "Comma in loc", "Comma(s) in the mapLocation (replaced with %)"),
-               ("locSyntax", "mapLoc fields", "APs with not exactly 3 fields in the mapLocation."),
+                'APs with mapLocation="default location".'
+                'Location limited to Building > Floor.'),
+               ("manset", "Loc & not Map",
+                "APs in 'Root Area' in CPI maps, but manually assigned a mapLocation."),
+               ("hasComma", "Comma in loc",
+                "Comma(s) in the mapLocation (replacing with %)"),
+               ("locSyntax", "mapLoc fields",
+                "APs with not exactly 3 '|'-separated fields in the mapLocation."),
                ("duplMac", "", "duplicate macAddresses. Fatal error."),
-               ("noMap", "not in Maps", "APs that are otherwise not assigned a location the Site Maps")
+               ("noMap", "not in Maps",
+                "APs that are otherwise not assigned a location the Site Maps")
                )
 
     dupl_mac_cnt = 0  					# duplicate macAddresses found. fatal error
     faceplate_cnt = 0  					# number of records w/o faceplate number
-
-    # loose syntax of faceplate to match on common errors too
-    separators = r'|'  					# Allow only pipe as a mapLocation field separator
-    faceplate_re = r'[0-9]{2,3}-[0-9]{2}-[sS]{0,1}[0-9]{1,3}-[a-zA-Z0-9][0-9]*'
-    # was r'([a-zA-Z]-)?[a-zA-Z0-9]+-[mMpP][0-9]+-[O]?[wW][0-9]+(-(OW|R|RW)[0-9]{2})?'
-    name_pat = r'((MatherQuad|CaseQuad|SouthRes)-)?[a-zA-Z0-9]+-[mMpP][0-9]+-[O]?[wW][0-9]+(-(OW|R|RW)[0-9]{2})*'
-    leading_faceplate_re = '^' + faceplate_re + ' '
 
     apd_reader = cpiapi.Cache.Reader(my_cpi, 'v4/data/AccessPointDetails', age=0.5)
     apd_dict = {}
@@ -121,20 +140,19 @@ def load_apd(report: bool) -> dict:
         std_fields = f'{mac_address:17} {ipAddress:14} {apName:20} "{locationHierarchy}", "{map_location}"'
         if re.search(r'\?', map_location):  # Question mark(s) in the mapLocation?
             report_err("questioned")
-        has_faceplate = False
+        has_faceplate = False           # no faceplate until we find one
         if re.search(leading_faceplate_re, map_location):  # starts with a faceplate number?
             # Replace the faceplate number with location
             map_location = re.sub(leading_faceplate_re, location + ' ', map_location, count=1)
             has_faceplate = True
-        # Silently remove any fn faceplate number(s) from the mapLocation
+        # Count and silently remove any faceplate number(s) from the mapLocation
         map_location, i = re.subn('[ ]?' + faceplate_re, '', map_location)
         if i > 0:
             has_faceplate = True
         if not has_faceplate:
             report_err("noFaceplate")
-        mac_re = r'([0-9A-Fa-f][0-9A-Fa-f]:){5}[0-9A-Fa-f]{2},?'
         if re.search(mac_re, map_location):  # One or more MAC address?
-            map_location, i = re.subn(mac_re, '', map_location)  # Remove
+            map_location, i = re.subn(mac_re, '', map_location)  # Remove MAC(s)
             report_err("macAdd")
         if not re.fullmatch(name_pat, apName):
             # AP name has incorrect syntax
@@ -185,9 +203,9 @@ def load_apd(report: bool) -> dict:
     tot_cnt = 0
     for name in report_txt:
         entry = report_txt[name]
-        if entry['cnt'] > 0:
-            print(f"{entry['cnt']:4} {entry['name']:13} {entry['full']}")
-        tot_cnt += entry['cnt']
+        if entry['count'] > 0:
+            print(f"{entry['count']:4} {entry['name']:13} {entry['full']}")
+        tot_cnt += entry['count']
 
     if dupl_mac_cnt > 0:
         print(f"{dupl_mac_cnt:4} duplicate macAddresses. Fatal error.")
