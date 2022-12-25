@@ -5,29 +5,34 @@
 """
 Report the clientSessions for client associations with APs during time window
 """
+from argparse import ArgumentParser
+from collections.abc import Sequence
 import csv
 import os.path
 import sys
 import time
+from typing import Dict, Union
+
 from cpiapi import Cpi
 from mylib import credentials, anyToSecs, millisToSecs, printIf, strfTime, verbose_1
-from argparse import ArgumentParser
-from collections.abc import Sequence
 """
 """
 
 '''
 To Do
-Use start_time that is 10 minutes earlier
+Use startTime that is 10 minutes earlier
 Update baddate handling immediately after time change
 Apply ' --> " change to table.py
 Why does HistoricalRFStats return just a few records?  w/o filtering on mac it returns ~58 records per sample time
 '''
 
 
-def get_vals(csvfilename: str):
-    """ return the set of values read from csvfilename csv file"""
-    with open(csvfilename, 'r', newline='') as val_file:
+def get_vals(filename: str) -> set:
+    """Read filename csv file and return the set of values in the 1st column
+
+    :param filename:    file name of a csv file
+    """
+    with open(filename, 'r', newline='') as val_file:
         val_reader = csv.reader(val_file)
         vals = set()
         for rec in val_reader:
@@ -36,10 +41,21 @@ def get_vals(csvfilename: str):
 
 
 def collect(tablename: str, filters: dict, cumulatives: Sequence,
-        selected: Sequence,	msectime: bool, transforms, macfunc, sortfunc):
+        selected: Sequence,	msecTime: bool, transforms, macFunc, sortFunc):
     """Collect table, filtered by 'filters' and 'macfunc', transform 'cumulatives' attributes to incremental
-    apply specific 'transforms', sort by sortfunc, and output the 'selected' """
-    filename = tablename + args.endtime.replace(':', '') + '.csv'
+    apply specific 'transforms', sort by sortFunc, and output the 'selected'
+
+    :param tablename:   name of the table (i.e. CPI API)
+    :param filters:
+    :param cumulatives:
+    :param selected:
+    :param msecTime:
+    :param transforms:
+    :param macFunc:     function(record) to retrieve the MAC address
+    :param sortFunc:    sortFunc(x) -> sorting key for x
+    :return:
+    """
+    filename = tablename + args.endTime.replace(':', '') + '.csv'
     if os.path.exists(filename): 		# does the file already exist?
         while True:
             response = input(f"{filename} exists. Overwrite? y/n: ")
@@ -51,7 +67,7 @@ def collect(tablename: str, filters: dict, cumulatives: Sequence,
                 pass
     printIf(args.verbose, f"reading {tablename}")
     f = {'.full': 'true', '.nocount': 'true'}  # standard filters
-    if msectime:
+    if msecTime:
         f['collectionTime'] = f"between({str(start_msec)},{str(end_msec)})"
     else:
         f['collectionTime'] = f'between("{start_time_bad}","{end_time_bad}")'
@@ -61,7 +77,7 @@ def collect(tablename: str, filters: dict, cumulatives: Sequence,
     prev_recs = {}						# initially, no previous records
     for rec in reader:
         try:
-            mac = macfunc(rec)			# mac OK
+            mac = macFunc(rec)			# mac OK
         except (KeyError, ValueError):  # No
             continue					# Ignore this record
         rec['macAddress'] = mac
@@ -74,7 +90,7 @@ def collect(tablename: str, filters: dict, cumulatives: Sequence,
                 continue				# drop record w/cumulatives from output
             prev_recs[mac_slot_id] = rec.copy()
         # Convert collectionTime to correct string form
-        if msectime:					# in integer milliseconds?
+        if msecTime:					# in integer milliseconds?
             rec['collectionTime'] = strfTime(millisToSecs(rec['collectionTime']))
         else:							# No, in ISO text that is 8 hours ahead
             rec['collectionTime'] = strfTime(anyToSecs(rec['collectionTime'])+2*3600)
@@ -83,8 +99,8 @@ def collect(tablename: str, filters: dict, cumulatives: Sequence,
         if transforms is not None:
             transforms(rec)				# execute specific field transforms
         buf.append(rec)					# accumulate record for output
-    if sortfunc is not None:			# specified sort order?
-        buf.sort(key=sortfunc)
+    if sortFunc is not None:			# specified sort order?
+        buf.sort(key=sortFunc)
     with open(filename, 'w', newline='') as write_file:
         writer = csv.DictWriter(write_file, selected, extrasaction='ignore')
         writer.writeheader()			# write the csv header line
@@ -92,11 +108,12 @@ def collect(tablename: str, filters: dict, cumulatives: Sequence,
             writer.writerow(rec)
 
 
-def clientMac(rec):
-    """Return rec['macAddress']['octets'] or raise KeyError if it is not in clients
+def clientMac(rec: Dict[str, Union[str, Dict[str, str]]]) -> str:
+    """Return the client MAC address from a [Historical]ClientStats record
+    Raises KeyError iff the MAC is not in clients
 
-    :param rec:
-    :return:
+    :param rec:     record from [Historical]ClientStats
+    :return:        MAC address [w/o colons]
     """
     mac = rec['macAddress']['octets']
     if mac in clients:
@@ -104,11 +121,13 @@ def clientMac(rec):
     raise KeyError
 
 
-def keyApMac(rec):
-    """Transform rec[key] to mac address w/o colons. extend rec with 'apName' from APDMAC[mac]
+def keyApMac(rec: Dict[str, Union[str, Dict[str, str]]]) -> str:
+    """Obtain the AP MAC address from a [Historical]Client[Counts|Traffics] record.
+    Copy AP's name from ap_mac to rec['apName']
+    Raises KeyError iff the MAC address is not in ap_macs.
 
-    :param rec:
-    :return:
+    :param rec:     record from [Historical]Client[Counts|Traffics]
+    :return:        MAC address w/o colons
     """
     mac = rec['key'].replace(':', '')  	# key has colons, but APDMAC does not
     if mac in ap_macs:
@@ -119,9 +138,11 @@ def keyApMac(rec):
 
 
 def apMac(rec):
-    """extend rec with 'apName' from APDMAC[mac address]
+    """Obtain the AP MAC address from a [Historical]RF[Counters|LoadStats|Stats] record.
+    Copy AP's name from ap_mac to rec['apName']
+    Raises KeyError iff the MAC address is not in ap_macs.
 
-    :param rec:
+    :param rec:     record from [Historical]RF[Counters|LoadStats|Stats]
     :return:
     """
     mac = rec['macAddress']['octets'] 	# macAddress_octets does not have punctuation
@@ -133,13 +154,13 @@ def apMac(rec):
 
 
 parser = ArgumentParser(description='Report the clientSessions for client associations with APs during time window')
-parser.add_argument('--APfile', action='store', dest='apfilename', default=None,
+parser.add_argument('--APfile', action='store', dest='apFilename', default=None,
     help='file name of csv file of the AP names to collect')
-parser.add_argument('--clientfile', action='store', dest='clientfilename', default=None,
+parser.add_argument('--clientFile', action='store', dest='clientFilename', default=None,
     help='File name of csv file of client mac addresses')
-parser.add_argument('--end', action='store', dest='endtime', default=None,
+parser.add_argument('--end', action='store', dest='endTime', default=None,
     help='minimum session start date-time. E.g. 2019-01-01T12:12')
-parser.add_argument('--start', action='store', dest='starttime', default=None,
+parser.add_argument('--start', action='store', dest='startTime', default=None,
     help='maximum session end date-time. E.g. 2019-01-01T14:12')
 parser.add_argument('--password', action='store', default=None,
     help='password')
@@ -157,7 +178,7 @@ s = "def attr(record):\n return record['" + "']['".join(lst) + "']"
 printIf(args.verbose, f"attribute function={s}")
 exec(s)									# define the function
 
-if args.apfilename is None:			    # Default set of APs?
+if args.apFilename is None:			    # Default set of APs?
     coreaps = {'samson-p6-w252', 'samson-p6-w254', 'samson-p6-w255', 'samson-p6-w257',
                'samson-p6-w258', 'samson-p6-w260',
             'samson-p9-w253', 'samson-p9-w256', 'samson-p9-w259'}
@@ -165,7 +186,7 @@ if args.apfilename is None:			    # Default set of APs?
     'samson-p9-w267', 'samson-p9-w250', 'samson-p9-w251', 'samson-p9-w244'}
     apnames = coreaps | neighboraps
 else:									# No. Read AP names from file
-    apnames = get_vals(args.apfilename)
+    apnames = get_vals(args.apFilename)
 
 # calculate startsWith filter as longest common prefex of apnames
 startsWith = None
@@ -183,17 +204,18 @@ for name in apnames:
         startsWith = startsWith[:j]
 printIf(args.verbose, f"startsWith={startsWith}")
 
-# calculate starttime and endtime values in milliseconds and ISO date text
+# calculate startTime and endTime values in milliseconds and ISO date text
 time_offset = 60 * 60 * 8				# Seconds that Cisco ISO are ahead of local time
-start_msec = int(1000*time.mktime(time.strptime(args.starttime, '%Y-%m-%dT%H:%M')))
+start_msec = int(1000*time.mktime(time.strptime(args.startTime, '%Y-%m-%dT%H:%M')))
 start_time_bad = time.strftime('%Y-%m-%dT%H:%M:%S',
                                time.localtime(start_msec / 1000.0 + time_offset)) + ".000+0500"
-end_msec = int(1000*time.mktime(time.strptime(args.endtime, '%Y-%m-%dT%H:%M')))
+end_msec = int(1000*time.mktime(time.strptime(args.endTime, '%Y-%m-%dT%H:%M')))
 end_time_bad = time.strftime('%Y-%m-%dT%H:%M:%S',
                              time.localtime(end_msec / 1000.0 + time_offset)) + ".000+0500"
-printIf(args.verbose, f"session start-time={strfTime(start_msec/1000.0)},"
-        f"end-time={strfTime(end_msec/1000.0)}")
-printIf(args.verbose, f"start-time-bad={start_time_bad}, end-time-bad={end_time_bad}")
+printIf(args.verbose,
+        f"session startime={strfTime(start_msec/1000.0)},"
+        f"endTime={strfTime(end_msec/1000.0)}")
+printIf(args.verbose, f"startTimebad={start_time_bad}, endTimebad={end_time_bad}")
 
 # establish login credentials
 server = 'ncs01.case.edu'
@@ -230,7 +252,7 @@ for name in apnames:
         print(f"unknown AP name {name} ignored")
 
 # read in client macAddresses
-client_raw = get_vals(args.clientfilename)
+client_raw = get_vals(args.clientFilename)
 clients = set()
 for mac in client_raw:
     clients.add(mac.replace(':', '')) 	# remove MAC punctuation
@@ -332,7 +354,7 @@ for record in reader:
         record['apName'] = record['apMacAddress']['octets']  # output its macAddress
     buf.append(record)
 buf.sort(key=lambda r: f"{r['macAddress']} {r['sessionStartTime']}")
-with open('ClientSessions' + args.endtime.replace(':', '') + '.csv', 'w', newline='') as writefile:
+with open('ClientSessions' + args.endTime.replace(':', '') + '.csv', 'w', newline='') as writefile:
     writer = csv.DictWriter(writefile, selected, extrasaction='ignore')
     writer.writeheader()
     for record in buf:

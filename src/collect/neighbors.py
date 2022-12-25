@@ -2,7 +2,8 @@
 #
 # neighbors.py Copyright (C) 2019 by Dennis Risen, Case Western Reserve University
 #
-""" To Do
+"""
+Application to report, for each AP slot, the co-channel noise from neighboring APs
 """
 import csv
 import math
@@ -127,7 +128,7 @@ if args.rxlimit > 0:				    # user specified a positive RSSI?
 server = args.server
 if args.password is None:		        # No password provided?
     try:
-        cred = credentials.credentials(server, args.username)
+        cred = credentials(server, args.username)
     except KeyError:
         print(f"No username/password found for {args.username} at {server}")
         sys.exit(1)
@@ -248,19 +249,11 @@ for rec in reader:
             channels[bldg][channelNumber] = 1
 
 
-def itemName(d: dict) -> list:
-    s = set()
-    for building in d:
-        for model in d[building]:
-            s.add(model)
-    return sorted(s)
-
-
 if args.inventory is not None:
     # report the AP models and 5.0 GHz channel qty in use by each building
-    mdl = itemName(models)
+    mdl = sorted({model for building in models for model in models[building]})
     mdl = dict((mdl[i], i) for i in range(len(mdl)))  # mapping from model to index
-    chan = sorted(itemName(channels))
+    chan = sorted({channel for building in channels for channel in channels[building]})
     chan = dict((chan[i], i) for i in range(len(chan)))  # map from channel to index
     # construct formats based on length of model name and channel
     f_hdr = '{:^' + str(12 + (8 if len(mdl) < 2 else 0) +
