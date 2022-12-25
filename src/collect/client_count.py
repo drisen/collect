@@ -16,8 +16,7 @@ from contextlib import ExitStack
 from cpiapi import Cpi
 import csv
 import gzip
-from credentials import credentials
-from cpiapi import fromTimeStamp, strfTime, strpTime, verbose_1
+from mylib import credentials, fromTimeStamp, strfTime, strpTime, verbose_1
 from argparse import ArgumentParser
 import os
 import platform

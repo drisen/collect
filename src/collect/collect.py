@@ -16,10 +16,9 @@ import threading
 from time import sleep, time
 from typing import Dict, Union
 
-from cpiapi import add_table, all_table_dicts, allTypes, anyToSecs, \
-    Cpi, date_bad, find_table, logErr, Pager, printIf, production, \
-    real_time, strfTime, SubTable, Table, to_enum, verbose_1
-from credentials import credentials
+from cpiapi import add_table, all_table_dicts, allTypes, Cpi, date_bad, \
+    find_table, Pager, production, real_time, SubTable, Table, to_enum
+from mylib import anyToSecs, credentials, strfTime, logErr, printIf, verbose_1
 
 TAU = 20 			# time-constant for recordsPerHour learning. Samples or Days
 """ To do

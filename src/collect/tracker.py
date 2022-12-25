@@ -24,7 +24,7 @@ from threading import Thread
 
 from awslib import key_split, listRangeObjects, print_selection
 import boto3
-from cpiapi import strpTime, strfTime, verbose_1
+from mylib import strpTime, strfTime, verbose_1
 from timeMachine import TimeMachine
 
 """ To Do

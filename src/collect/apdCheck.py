@@ -12,7 +12,7 @@ import re
 import sys
 
 import cpiapi
-from credentials import credentials
+from mylib import credentials
 
 """ To Do
 - load the GroupSpecifications table

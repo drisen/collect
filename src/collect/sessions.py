@@ -9,8 +9,8 @@ import csv
 import os.path
 import sys
 import time
-from cpiapi import Cpi, anyToSecs, millisToSecs, printIf, strfTime, verbose_1
-from credentials import credentials
+from cpiapi import Cpi
+from mylib import credentials, anyToSecs, millisToSecs, printIf, strfTime, verbose_1
 from argparse import ArgumentParser
 from collections.abc import Sequence
 """
@@ -199,7 +199,7 @@ printIf(args.verbose, f"start-time-bad={start_time_bad}, end-time-bad={end_time_
 server = 'ncs01.case.edu'
 if args.password is None:			    # No password provided?
     try:
-        cred = credentials.credentials(server, args.username)
+        cred = credentials(server, args.username)
     except KeyError:					# Couldn't find
         print(f"No username/password credentials found for {server}")
         sys.exit(1)

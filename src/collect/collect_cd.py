@@ -16,7 +16,7 @@ import re
 import time
 
 import cpiapi
-from credentials import credentials
+from mylib import credentials, logErr, strfTime
 """To Do
 
 """
@@ -75,7 +75,7 @@ def read_state(file_name: str, tables: dict):
         for table in tables_w_key: 		# log table(s) that won't be updated
             no_state.append(f"{table.tablename} {table.version} not updated.")
     if len(no_state) > 0:
-        cpiapi.logErr(f"read_state: {' '.join(no_state)}")
+        logErr(f"read_state: {' '.join(no_state)}")
 
 
 change_period = 4 * 60 * 60				# time period for changing output files
@@ -111,7 +111,7 @@ for base_name in os.listdir(outputPath):
             os.rename(os.path.join(outputPath, base_name),
                       os.path.join('files', m.group(1) + 'ClientBriefv4.csv'))
         except Exception as e:
-            cpiapi.logErr(f"{e} while renaming {base_name} to ./files")
+            logErr(f"{e} while renaming {base_name} to ./files")
 
 while True:								# loop forever
     # start a new output file each change_period
@@ -153,11 +153,11 @@ while True:								# loop forever
                 print(f"ConnectionError {ce}")
                 # just keep waiting for CPI to become available
             outfile.flush()
-            print(f"{cpiapi.strfTime(float(poll_time))} {dupl_cnt} duplicate and {rec_cnt} new records")
+            print(f"{strfTime(float(poll_time))} {dupl_cnt} duplicate and {rec_cnt} new records")
             write_state('collect_cd.json', {'ClientDetails': [tbl]})
             poll_time = poll_period * (1 + int(time.time() / poll_period))
     # Move the csv file to ./files
     try:
         os.rename(file_name, os.path.join('files', base_name))
     except Exception as e:
-        cpiapi.logErr(f"{e} renaming file to ./files")
+        logErr(f"{e} renaming file to ./files")

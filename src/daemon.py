@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 """ An example of a Linux daemon written in Python.
+Exploration of making the collect application a daemon
 Based on http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
 The changes are:
 1 - Uses file open context managers instead of calls to file().

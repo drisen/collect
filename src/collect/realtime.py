@@ -12,8 +12,8 @@ import time
 import math
 import statistics
 
-from cpiapi import Cpi, logErr, printIf
-from credentials import credentials
+from cpiapi import Cpi
+from mylib import credentials, logErr, printIf
 """
 The service-provider layer for application(s) that provide realtime
 advice based on the number of people (actually client devices) in a Wi-Fi
@@ -451,7 +451,7 @@ while True:
             sampleNum += 1
             time.sleep(t1+sampleNum*60-time.time())
             tn = time.time()
-            samplen, i = tableGet(args.table, args.attrs, args.where, args.key, args.timestamp)
+            sampleN, i = tableGet(args.table, args.attrs, args.where, args.key, args.timestamp)
             if i > 0:
                 # errors caused sleeping and retry(s).
                 logErr('Sleeping upset 1st sample')
@@ -462,15 +462,15 @@ while True:
                 logErr('Sample', sampleNum, 'has different number of items')
                 continueMain = True
                 break
-            offsetT = min(offsetT, tn - min(rec['time'] for rec in samplen))
+            offsetT = min(offsetT, tn - min(rec['time'] for rec in sampleN))
             printIf(args.verbose, 'minimized offsetT=', offsetT, 'seconds')
-            offsetT = max(offsetT, tn - max(rec['time'] for rec in samplen))
+            offsetT = max(offsetT, tn - max(rec['time'] for rec in sampleN))
             .(args.verbose, 'maximized offsetT=', offsetT, 'seconds')
             # add samples into the 'time'+'key' dictionary
-            for rec in samplen:
+            for rec in sampleN:
                 sampleDict[str(rec['time'])+str(rec['key'])] = {rec['key'], rec['time']}
             # Are all of the times changed from sample1?
-            for rec in samplen:
+            for rec in sampleN:
                 if rec['key'] in dict1:
                     dict['key']['timeN'] = rec['time']
                     if rec['time'] != dict1[rec['key']]['time']:
@@ -492,7 +492,7 @@ while True:
             periodStd = statistics.sdev((rec['timeN']-rec['time'] for rec in dict1), mu=period)
             sampleList = list(v for k, v in sampleDict)
             sampleList.sort(key=lambda x: x['time'])
-            sampleList = sampleList[:2*len(samplen)] 	# 2 polling cycles of samples sorted by timestamp
+            sampleList = sampleList[:2*len(sampleN)] 	# 2 polling cycles of samples sorted by timestamp
             # find the starting time of the longest time gap between timestamps
             gapMax = -1
             gapStart = -1
@@ -509,7 +509,7 @@ while True:
             printIf(args.verbose, 'Found', gapMax, 'second gap in', period,
                     'second period with', periodStd, 'standard deviation')
             # output sampleN
-            summary = tableSummary(args.attrs, samplen)
+            summary = tableSummary(args.attrs, sampleN)
             summarySaveCsv(basefilename + str(tn), summary, args.csv)
 
             # During steady-state, poll twice per CPI period in order to phase-lock

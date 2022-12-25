@@ -7,7 +7,7 @@ into a single nnn_tablename.csv file and deletes the nnn_tablename.parts.
 """
 
 from collections import defaultdict
-from cpiapi import logErr
+from mylib import logErr
 from os import listdir, mkdir, remove, rename, rmdir
 from os.path import isdir, join
 import re

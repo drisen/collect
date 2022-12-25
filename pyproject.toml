@@ -1,3 +1,28 @@
 [build-system]
-requires = ["setuptools>=59", "wheel>=0.36"]
+requires = ["setuptools>=65.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "collect"
+version = "2.0.3"
+authors = [ { name="Dennis Risen", email="dar5@case.edu" }, ]
+description = "Applications to collect and report statistics from the CPI APIs"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Licence :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: Unix",
+              ]
+dependencies = [ "boto3>=1.21",
+    "awslib @ git+https://github.com/drisen/awslib.git",
+    "cpiapi @ git+https://github.com/drisen/apiapi.git",
+    "mylib @ git+https://github.com/drisen/mylib.git",
+    "timeMachine @ git+https://github.com/drisen/timeMachine.git",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/drisen/cpiapi"
+"Bug Tracker" = "https://github.com/drisen/cpiapi/issues"

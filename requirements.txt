@@ -1,11 +1,6 @@
 boto3>=1.21
-git+https://github.com/drisen/awslib.git
-git+https://github.com/drisen/credentials.git
-git+https://github.com/drisen/cpiapi.git
-pytz>=2022.1    # due to cpiapi
-requests        # due to cpiapi
-urllib3         # due to cpiapi
-git+https://github.com/drisen/loom.git
-git+https://github.com/drisen/timeMachine.git
-# the following absolute file reference works, but would prefer a relative reference
-# cpiapi @ file:///G:/My%20Drive/Case/PyCharm/cpiapi
+git+https://github.com/drisen/awslib
+git+https://github.com/drisen/cpiapi
+git+https://github.com/drisen/mylib
+git+https://github.com/drisen/timeMachine
+# cpiapi @ ../cpiapi

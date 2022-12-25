@@ -14,7 +14,7 @@ import json
 import time
 
 import cpiapi
-from credentials import credentials
+from mylib import credentials, logErr
 """ To Do
 - Fix the poller. After an initial read through 8 x 1000001 records, it repeatedly
 sleeps 299 seconds and reads nothing
@@ -72,7 +72,7 @@ def read_state(file_name: str, tables: dict):
         for table in tables_w_key: 		# log table(s) that won't be updated
             no_state.append(f"{table.tablename} {table.version} not updated.")
     if len(no_state) > 0:
-        cpiapi.logErr(f"read_state: {' '.join(no_state)}")
+        logErr(f"read_state: {' '.join(no_state)}")
 
 
 change_period = 4 * 60 * 60				# time period for changing output files

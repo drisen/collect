@@ -12,7 +12,7 @@ import os
 import re
 import time
 
-import cpiapi
+import mylib
 """ To Do
 Extend to handle more 6GHz too
 """
@@ -71,7 +71,7 @@ for filename in os.listdir(file_path):
                     min_time = min(min_time, sessionEndTime)
                 max_time = max(max_time, sessionStartTime)
                 min_time = min(min_time, sessionStartTime)
-print(f"records span at least {cpiapi.strfTime(min_time)} to {cpiapi.strfTime(max_time)}")
+print(f"records span at least {mylib.strfTime(min_time)} to {mylib.strfTime(max_time)}")
 
 # write the summary
 protocols = list(protocols)

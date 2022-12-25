@@ -13,7 +13,8 @@ import statistics
 import sys
 
 import awslib
-from cpiapi import all_table_dicts, find_table, numericTypes, strfTime, SubTable, Table, verbose_1
+from cpiapi import all_table_dicts, find_table, numericTypes, SubTable, Table
+from mylib import strfTime, verbose_1
 
 """ TO DO
 AccessPointDetail: 1st sample on laptop was started 297 seconds later --> some different results

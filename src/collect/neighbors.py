@@ -12,8 +12,8 @@ import sys
 from time import time
 from typing import Union
 
-from cpiapi import all_table_dicts, Cpi, Cache, printIf, secsToMillis, strfTime, verbose_1
-from credentials import credentials
+from cpiapi import all_table_dicts, Cpi, Cache
+from mylib import credentials, printIf, secsToMillis, strfTime, verbose_1
 # map channelNumber to lower channel of 40MHz channel pair
 pairs = dict()
 for i in range(36, 148):
