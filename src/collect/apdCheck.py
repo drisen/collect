@@ -10,6 +10,7 @@ for syntactically valid mapLocation information
 from argparse import ArgumentParser
 import re
 import sys
+from typing import Any
 
 import cpiapi
 from mylib import credentials
@@ -28,8 +29,13 @@ from mylib import credentials
 """
 
 
-def dig_down(row: dict, path: str):
-    """Return value of row.path. Path has form name [_ name]* ."""
+def dig_down(row: dict, path: str) -> Any:
+    """Return the value of row.path. Path has form name(_name)* .
+
+    :param row:     dict, potentially nested
+    :param path:    path through ``row`` to the requested value
+    :return:        Value at the end of path
+    """
     i = path.find('_')
     if i < 0:  							# Simple attribute name?
         return row[path]  				# Yes, return attribute value
@@ -37,27 +43,26 @@ def dig_down(row: dict, path: str):
 
 
 def load_apd(report: bool) -> dict:
-    """Returns a dict of the contents of the AccessPointDetails table
-    optionally report problem(s) with each entry in the table
+    """Returns a dict of the contents of the AccessPointDetails table.
+    optionally report problem(s) with each entry in the table.
 
-    Parameters:
-        report (bool): True to write report of mapLocation problems
-    Returns:
-        (dict): 	of {macAddress : ['macAddress': macAddress, 'name': name,]}
-"""
+    :param report:  True to write report of mapLocation problems
+    :return:        {{macAddress : ['macAddress': macAddress, 'name': name,]}, ...}
+    """
     last_std_fields = ''
 
     def report_err(problemName: str):
-        """Increment problem count for problemCode. Print problemCode and AP info.
+        """Increment the problem count for problemName.
+        Print problemName, with AP info for 1st problem for an AP
 
-        :param problemName:     problem name
+        :param problemName: problem name
         """
         nonlocal last_std_fields
         report_txt[problemName]['count'] += 1  # always increment count of this problem
         if problemName in omit_detail:  # listing of each instance turned off?
             return                      # Yes. return w/o printing the instance
-        if not report:                  # report not requested
-            return                        # Yes. skip reporting
+        if not report:                  # report not requested?
+            return                      # Yes. skip reporting
         if last_std_fields == std_fields:  # Same AP as last report_err?
             print(f"{report_txt[problemName]['name']:13} in above")  # Yes. Just output problemName
         else:                           # No. different AP
@@ -65,13 +70,11 @@ def load_apd(report: bool) -> dict:
         last_std_fields = std_fields  	# remember last, for above output
 
     def build_dict(result: dict, *entries):
-        """Return a dictionary of the entries in result
+        """Add a problem entry to ``result`` for each ``entries`` tuple.
 
-        :param result:      build the dictionary here
-        :param entries:     each entry of the form (problemName, brief description, full description)
-        :return: dict of the form {problemName: {
+        :param result:      Add entries to this existing dict
+        :param entries:     each of the form (problemName, brief description, full description)
         """
-        """Add a problem entry to result for each entry tuple."""
         for name, brief, full in entries:
             result[name] = {"count": 0, "name": brief, "full": full}
 
@@ -240,7 +243,7 @@ if not args.faceplate:
 if not args.locsyntax:
     omit_detail.add('locSyntax')
 
-cred = credentials.credentials('ncs01.case.edu')  # get default login credentials
+cred = credentials('ncs01.case.edu')  # get default login credentials
 my_cpi = cpiapi.Cpi(cred[0], cred[1])  # server instance
 
 sd_reader = cpiapi.Cache.Reader(my_cpi, 'v4/data/ServiceDomains', age=0.5)

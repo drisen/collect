@@ -5,6 +5,9 @@
 """
 Application to report, for each AP slot, the co-channel noise from neighboring APs
 """
+""" To Do
+Extend to process 6GHz channels too
+"""
 import csv
 import math
 from argparse import ArgumentParser
@@ -25,7 +28,11 @@ pairs[165] = 165
 
 
 def dBm(mwatt: float) -> Union[int, float]:
-    """Convert mwatt to int dbm. Returns NaN when out of range for an int"""
+    """Convert ``mwatt`` to int dbm. Returns NaN when out of range for an int
+
+    :param mwatt:   milliwatts
+    :return:        dBm or NaN if out of range for an integer
+    """
     try:
         return int(10*math.log10(mwatt))
     except ValueError:
@@ -33,7 +40,11 @@ def dBm(mwatt: float) -> Union[int, float]:
 
 
 def map_chan(channel: int) -> int:
-    """Map 5.0GHz channel number to 40MHz lower channel."""
+    """Map 5.0GHz channel number to 40MHz lower channel.
+
+    :param channel:     Primary of possibly bonded ``channel``
+    :return:            lower channel for ``channel``
+    """
     try:
         channel = pairs[channel]
     except KeyError:
@@ -42,7 +53,14 @@ def map_chan(channel: int) -> int:
 
 
 def select(source: dict, *fields) -> dict:
-    """Return new dict with *fields, as present, copied from source."""
+    """Like relational SELECT ``*fields`` from ``source``.
+
+    Ignores fields missing in ``source``
+
+    :param source:  dict
+    :param fields:  field names of the fields to be included
+    :return:        new dict with selected fields from ``source``
+    """
     result = dict()
     for field in fields:
         try:

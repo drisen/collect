@@ -4,8 +4,9 @@
 """
 Produce csv reports, apClientCountsAuthYYYY-MM-DD and apClientCountsTotYYYY-MM-DD
 of the number of wireless clients associated with each AP
-in the listed buildings in each 30 minute interval for either (from CPI server)
-the previous day, or (from AWS S3) during the specified range of dates
+in the listed buildings in each 30 minute interval.
+Range of dates is either the previous day (from CPI server)
+or the specified range of dates (from AWS S3).
 
 """
 import cpiapi
@@ -31,7 +32,6 @@ from typing import Union
 
 """ To Do
 Verify that it is using Eastern time
-
 """
 
 csv_path = 'files'  # directory for collect's output files from after noon yesterday
@@ -84,7 +84,7 @@ class TimedTable:
             # load dict indexed by key_field from API
             if TimedTable.my_cpi is None:
                 # initialize Cpi
-                cred = credentials.credentials('ncs01.case.edu')  # get default login credentials
+                cred = credentials('ncs01.case.edu')  # get default login credentials
                 TimedTable.my_cpi = Cpi(cred[0], cred[1])  # for CPI server instance
             self.tm = {row[key_field]: row for row in Cpi.Reader(TimedTable.my_cpi, api_path)}
 
@@ -323,8 +323,8 @@ if from_aws:  							# reading range of days from AWS?
     def apMac(row) -> str:  			# get the mac_address_octets field
         """return row['macAddress_octets']
         
-        :param row: 
-        :return: 
+        :param row:     AccessPointDetails record
+        :return:        macAddress octets
         """
         return row['macAddress_octets']  # from pre-processed AccessPointDetails record
 
@@ -351,8 +351,8 @@ else:  # No. Reading from collect's local files
     def apMac(row: dict) -> str:  		# get the macAddress_octets field
         """return row['macAddress']['octets']
         
-        :param row: 
-        :return: 
+        :param row:     AccessPointDetails record
+        :return:        macAddress octets
         """
         return row['macAddress']['octets']  # from raw AccessPointDetails API record
 

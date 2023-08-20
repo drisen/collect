@@ -110,10 +110,10 @@ def collect(tablename: str, filters: dict, cumulatives: Sequence,
 
 def clientMac(rec: Dict[str, Union[str, Dict[str, str]]]) -> str:
     """Return the client MAC address from a [Historical]ClientStats record
-    Raises KeyError iff the MAC is not in clients
 
     :param rec:     record from [Historical]ClientStats
     :return:        MAC address [w/o colons]
+    :raises         KeyError iff the MAC is not in clients
     """
     mac = rec['macAddress']['octets']
     if mac in clients:
@@ -124,10 +124,10 @@ def clientMac(rec: Dict[str, Union[str, Dict[str, str]]]) -> str:
 def keyApMac(rec: Dict[str, Union[str, Dict[str, str]]]) -> str:
     """Obtain the AP MAC address from a [Historical]Client[Counts|Traffics] record.
     Copy AP's name from ap_mac to rec['apName']
-    Raises KeyError iff the MAC address is not in ap_macs.
 
     :param rec:     record from [Historical]Client[Counts|Traffics]
     :return:        MAC address w/o colons
+    :raises         KeyError iff the MAC is not in ap_macs
     """
     mac = rec['key'].replace(':', '')  	# key has colons, but APDMAC does not
     if mac in ap_macs:
@@ -137,13 +137,13 @@ def keyApMac(rec: Dict[str, Union[str, Dict[str, str]]]) -> str:
     raise KeyError
 
 
-def apMac(rec):
+def apMac(rec) -> str:
     """Obtain the AP MAC address from a [Historical]RF[Counters|LoadStats|Stats] record.
     Copy AP's name from ap_mac to rec['apName']
-    Raises KeyError iff the MAC address is not in ap_macs.
 
     :param rec:     record from [Historical]RF[Counters|LoadStats|Stats]
-    :return:
+    :return:        MAC
+    :raises         KeyError iff the MAC is not in ap_macs
     """
     mac = rec['macAddress']['octets'] 	# macAddress_octets does not have punctuation
     if mac in ap_macs:

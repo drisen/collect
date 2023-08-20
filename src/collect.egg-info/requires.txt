@@ -1,5 +1,5 @@
 boto3>=1.21
-awslib@ git+https://github.com/drisen/awslib.git
-cpiapi@ git+https://github.com/drisen/apiapi.git
-mylib@ git+https://github.com/drisen/mylib.git
-timeMachine@ git+https://github.com/drisen/timeMachine.git
+awslib@ git+https://github.com/drisen/awslib
+cpiapi@ git+https://github.com/drisen/cpiapi
+mylib@ git+https://github.com/drisen/mylib
+timeMachine@ git+https://github.com/drisen/timeMachine
