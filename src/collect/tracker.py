@@ -21,6 +21,7 @@ import os
 from queue import Queue
 import re
 from threading import Thread
+from typing import DefaultDict, Union
 
 from awslib import key_split, listRangeObjects, print_selection
 import boto3
@@ -105,6 +106,9 @@ class L1r:
         return result
 
     def close(self):
+        """Close self and the reader
+
+        """
         self.stop = True				# stop reader from reading more
         while self.look_ahead is not None:  # empty the Q so that reader can exit
             self.__next__()
@@ -117,11 +121,11 @@ def out(start: float, end: float, tup: tuple, user_name: str):
     Appends to bye and hi.
     Updates client_user[client_mac][user_name][0] and visited[client_mac][ap_mac].
 
-    Parameters:
-        start:			epoch-seconds at association
-        end:			epoch-seconds at dissociation
-        tup:			(ap_mac, client_mac)
-        user_name:		userName
+    :param start:       epoch-seconds at association
+    :param end:         epoch-seconds at dissociation
+    :param tup:         (ap_mac, client_mac)
+    :param user_name:   userName
+    :return:
     """
     global hi, bye, client_user, visited
     dt = end-start+period
@@ -186,8 +190,8 @@ def client_user_process():
     and proportion its seconds to the other users. map {user:seconds, ...} to {user:p}
     if only user '', record its seconds in anonymous[client_mac]
 
-    Iterates args.mac.
-    Updates track_macs.
+    Iterates ``args.mac``.
+    Updates ``track_macs``.
     """
     global client_report, client_user, track_macs, auth_macs, auth_secs
     global multi_macs, multi_secs, single_macs, single_secs
@@ -217,7 +221,7 @@ def client_user_process():
             # Yes. Sort descending by p so that greatest user is 1st in reporting
             user_d = [(u, lst) for u, lst in user_d.items()]  # extract dict to list
             user_d.sort(key=lambda x: -x[1][1])  # sort by descending p
-            client_user[client_mac] = dict(user_d)  # put back the dict
+            client_user[client_mac]: DefaultDict[str, list] = defaultdict(str, user_d)
             multi_macs += 1
             multi_secs += secs
             if args.verbose:			# Report MAC that authenticated as multiple users
@@ -242,17 +246,17 @@ def client_user_process():
 
 
 def sort_hi_bye():
-    """sorts hi and bye"""
+    """sorts global ``hi`` and ``bye``"""
     global hi, bye
     hi.sort(key=lambda x: x[0])			# sort entrances by ascending association time
     bye.sort(key=lambda x: x[0])		# sort exits by ascending disassociation time
 
 
 def visited_process():
-    """process visited classify clients as infrastructure.
+    """Process visited. Classify infrastructure clients as such..
 
-    Iterates and updates visited.
-    Builds infra_mac.
+    Iterates and updates ``visited``.
+    Builds ``infra_mac``.
     """
     global visited, infra_mac, visited_report
     # Classify client_mac as infrastructure if it didn't move and is associated most of the time
@@ -268,7 +272,7 @@ def visited_process():
         else:							# sort associated APs by descending association time
             d_lst = list(d.items())
             d_lst.sort(key=lambda x: -x[1])
-            visited[client_mac] = dict(d_lst)
+            visited[client_mac] = defaultdict(DefaultDict[str, float], d_lst)
     if args.verbose:
         histo = [(cnt, secs) for cnt, secs in histo.items()]
         histo.sort()
@@ -297,7 +301,7 @@ def check_visited():
 def aggregate(ap_mac: str, end_time: float):
     """Aggregate statistics at AP from its start time through this end_time
 
-    Iterates by_ap[mac]['clients']
+    Iterates ``by_ap[mac]['clients']``
 
     :param ap_mac:		AP to aggregate
     :param end_time: 	aggregate through this time and update start<-end_time
@@ -311,7 +315,7 @@ def aggregate(ap_mac: str, end_time: float):
         return							# no aggregation to do
     if start == end_time:				# statistics are up-to-date?
         return							# Yes. return
-    clients = ap['clients']
+    clients: list = ap['clients']
     if len(clients) < 2:
         return							# no exposure w/o 2 or more clients
     # aggregate statistics for the interval from start to end_time
@@ -337,7 +341,12 @@ def aggregate(ap_mac: str, end_time: float):
                 exposed[b_mac] += weight
 
 
-def apMac(row) -> str:					# get the mac_address_octets field
+def apMac(row) -> str:
+    """getter for the mac_address_octets field
+
+    :param row:     flattened AccessPointDetails record
+    :return:        MAC without colons
+    """
     return row['macAddress_octets'].replace(':', '')  # without the colons
 
 
@@ -345,7 +354,7 @@ def ap_str(ap_mac: str) -> str:
     """format AP macAddress as AP name and location string
 
     :param ap_mac: client device MAC
-    :return: 	ap_name location
+    :return: 	formatted AP macAddress as AP name and location str
     """
     ap = apd_mac.get(ap_mac, None) 	# {'name': apName, 'building': site['building'],
     # 'floor': site['floor'], 'mapLocation': map_loc, ...}
@@ -389,10 +398,10 @@ def mac_str(client_mac: str) -> str:
 
 
 def pairs_thread():
-    """While pairs_q is not null, get (clients, dt) and accumulate dt for all combinations of clients.
+    """While ``pairs_q` is not null, get (clients, dt) and accumulate dt for all combinations of clients.
 
-    Iterates each list passed through pairs_q
-    Updates client_pairs, sym_pairs
+    Iterates each list passed through ``pairs_q``
+    Updates ``client_pairs``, ``sym_pairs``
     """
     global client_pairs, sym_pairs
     while True:
@@ -507,8 +516,8 @@ Histogram individual’s risk: the of number of users by by risk=sum_over_all_ot
 # apd_mac = Dict(2) 				# {'name': apName, 'building': site['building'],
 # 	'floor': site['floor'], 'mapLocation': map_loc, }
 # Record for each client_MAC, the time that it is associated with each AP
-visited = defaultdict(lambda: defaultdict(float))  # Dict(2, 0.0)				# {client_mac: {ap_mac: total_seconds ...}, ...}
-
+visited = defaultdict(lambda: defaultdict(float))  # {client_mac: {ap_mac: total_seconds ...}, ...}
+visited: DefaultDict[str, DefaultDict[str, float]]
 apd.epoch_msec = int(1000*range_start)  # Set the TimeMachines to epoch msec
 sites.epoch_msec = int(1000*range_start)
 apd_reader = apd.values()				# fresh generator
@@ -572,16 +581,20 @@ for row in apd_reader:
 polled_time = 0							# less than any real collectionTime
 # in pass 1
 by_ap = defaultdict(lambda: defaultdict(int))  # Dict(2)			# {ap_mac: {client_mac: CSD_rec with extra fields, ...}, ...}
+by_ap: DefaultDict[str, DefaultDict[str, Union[float, list]]]
 # In pass 1, the the AP that each client_mac is associated with
 by_client = {}							# {client_mac: ap_mac, ...}
 # The total risk at each AP, sum(dt*clients*(clients-1)/2)
 risk = defaultdict(int)  # Dict(1)							# {ap_mac: sum(), ...}
 # In the 2nd pass, the sum of the time that maca and macb are nearby. maca < macb
 client_pairs = defaultdict(lambda: defaultdict(float))  # {maca: {macb: sum(dt), ...}, ...) maca < macb
-sym_pairs = defaultdict(lambda: defaultdict(float))  # {maca: {macb: sum(dt), ...}, ...)
+client_pairs: DefaultDict[str, DefaultDict[str, float]]
+sym_pairs = defaultdict(lambda: defaultdict(str, float))  # {maca: {macb: sum(dt), ...}, ...)
+sym_pairs: DefaultDict[str, ]
 
 # In the 1st pass, build the client_user Dict to infer p(user|mac)
 client_user = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))  # {mac: {user: [sum of time, p]}, ...}, ...}
+client_user: DefaultDict[str, DefaultDict[str, list]]
 # Convert the poll samples into a compact form for linear-time client insert/remove
 # in the 2nd pass. For each association-to-dissociation time interval, insert a
 # (ap_mac, client_mac, user) entry into the hi and goodbye lists:

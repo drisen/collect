@@ -3,8 +3,8 @@
 # collect.py Copyright (C) 2019 Dennis Risen, Case Western Reserve University
 #
 """
-Continuously collect statistics from CPI APIs on the API
-definitions listed in cpiapi.production and write each sample to ./files
+Continuously collect statistics from CPI APIs that are listed in
+cpiapi.production and write each sample to ./files
 """
 from argparse import ArgumentParser
 from collections import defaultdict
@@ -21,10 +21,9 @@ from cpiapi import add_table, all_table_dicts, allTypes, Cpi, date_bad, \
 from mylib import anyToSecs, credentials, strfTime, logErr, printIf, verbose_1
 
 TAU = 20 			# time-constant for recordsPerHour learning. Samples or Days
+sampling = [-1, 20, 1]  # initialize down-counter to sample [no, nth, every] record
 """ To do
-- Save to collect.json whenever scheduler sleeps
-- ClientSessions unknown field sessionTime has 1 int
-- ClientSessions.authorizationPolicy has no data
+- implement ``--exclude`` option to exclude selected table from collection
 - in HistoricalRF*, the collectionTime is corrected and output in csv with +0400 offset.
     Sample done at 2019-10-01-T20:32 contains data for up to 2019-10-02-T04:20:30+0400.
     This is not impossible since it is almost 60 minutes before sample time, because EDT is -0500.
@@ -51,46 +50,47 @@ Not to do
 
 
 def check_fields(table: SubTable, record: dict):
-    """fields==>check field types present; enums==> check enum values present
+    """Sample [no | every n'th | every] record based on table.check_[enums|fields].
+    For each enum field, count the instances by value.
+    for each field, count the instances by types.
 
-    Parameters:
-        table (SubTable):		the Table
-        record (dict):			a flattened record
+    :param table:       the [Sub]Table
+    :param record:      a flattened record
     """
-    if not table.check_fields and not table.check_enums: 	# no checking to do?
-        return							# Yes, quickly return
-    for key in record:					# for each field ...
-        val = record[key]
-        if table.check_fields:
-            typ = type(val) 			# type of current field value
-            table.field_counts[key][typ] += 1  # Number of instances of each type
-        if not table.check_enums:
-            continue
-        ftk = table.fieldTypes.get(key, None)
-        if ftk is not None and isinstance(ftk['values'], dict):  # defined ENUM?
-            table.field_values[key][val] += 1
+    table.check_enums -= 1
+    table.check_fields -= 1
+    if table.check_enums == 0:          # Counter underflow?
+        for key, val in record.items():  # Yes -- sample. Count values by ENUM field
+            ftk = table.fieldTypes.get(key, {'values': None})  # field's type definition
+            if isinstance(ftk['values'], dict):  # defined as an ENUM?
+                table.field_values[key][val] += 1  # count by enum value
+        table.check_enums = table.sample_enums
+    if table.check_fields == 0:         # Counter  underflow?
+        for key, val in record.items():  # Yes -- sample. Count types by field
+            table.field_counts[key][type(val)] += 1  # Number of instances of each type
+        table.check_fields = table.sample_fields
 
 
-def check_fields_init(sub_table: SubTable, fields: bool = True, enums: bool = True):
+def check_fields_init(sub_table: SubTable, fields: int = 0, enums: int = 0):
     """Initialize table for check_fields and field_report.
-    Parameters:
-        sub_table (SubTable):	Table or SubTable
-        fields (bool):			True to count field value type(s)
-        enums (bool):			True to count ENUM values
 
+    :param sub_table:   Table or SubTable
+    :param fields:  count field value type(s) in {0=no, 1=sample, 2=all) records
+    :param enums:   count ENUM values in {0=no, 1=sample, 2=all) records
     """
     sub_table.field_counts = defaultdict(lambda: defaultdict(int))  # count of instances of each field
     sub_table.field_values = defaultdict(lambda: defaultdict(int))  # count of each value for each enum field
-    sub_table.check_fields = fields
-    sub_table.check_enums = enums
+    sub_table.check_enums = sub_table.sample_enums = sampling[min(enums, len(sampling))]
+    sub_table.check_fields = sub_table.sample_fields = sampling[min(fields, len(sampling))]
 
 
 def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphore = None):
-    """Collect the tables in tables dictionary
-    Parameters:
-        tables (dict):			tables to collect {table_name: table, ...}
-        real_time (bool):		True for real-time priority collector
-        semaphore (threading.Semaphore): the low-priority collector's Semaphore
+    """Collect the tables in ``tables`` dictionary
+
+    :param tables:      tables to collect {table_name: table, ...}
+    :param real_time:   True for real-time priority collector
+    :param semaphore:   semaphore (threading.Semaphore): the low-priority collector's Semaphore
+    :return:
     """
     my_name = '+' if real_time else '-'
     print(my_name)
@@ -109,9 +109,12 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
     else:  								# there was no record
         logErr(f"Could not read CPI's {tableURL}")
         sys.exit(1)
+    # ClientSessions API frequently times-out with TIMEOUT set to 120
+    myCpi.TIMEOUT = 180.0
 
     if not args.reset:  				# user didn't ask to reset?
-        read_state('realtime.json' if real_time else 'collect.json', tables)  # Restore state from previous run
+        # Restore state from previous run
+        read_state('realtime.json' if real_time else 'collect.json', tables)
 
     # On start-up, collection might be well behind schedule.
     # Reduce batch sizes to reduce the maximum time until each table's oldest
@@ -121,25 +124,27 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
         Pager.timeScale = Pager.timeScale / 2  # 1/2-size batches until 1st sleep
 
     loopForever = True
-    cycle = 0
+    cycle = 1                           # report immediately
     while loopForever:
+        cycle -= 1
         loopForever = not args.single  	# Loop forever, except for a single poll
-        if args.verbose > 0 and cycle % 10 == 0:  # Every 10th table retrieval ...
-            # Report the current scheduling information for each table
+        if args.verbose > 0 and cycle == 0:  # Every n'th job retrieval ...
+            # ... Report the current scheduling information for each table
+            cycle = 10
             print(f"\n{my_name}{'lastId':>12},{'minSec':>20},{'maxTime':>20},"
             + f"{'nextPoll':>20},{'startPoll':>20}, recs/Hr, Hrs, tableName")
-            for tbl_name in tables:
-                tbls = tables[tbl_name]
-                for tbl in tbls:
-                    print(f"{my_name}{tbl.lastId:12}, ", end='')
-                    print(','.join("{:>20}".format(strfTime(t) if isinstance(t, str) and t != '0' or t > 0 else '-')
-                        for t in (tbl.minSec, tbl.maxTime, tbl.nextPoll, tbl.startPoll)), end='')
-                    secs = anyToSecs(tbl.maxTime)
-                    hours = int((time() - secs) / 3600) if secs is not None and secs != 0.0 else ''
-                    print(f",{int(tbl.recordsPerHour):8},{hours:4}, {tbl.tableName}")
-        cycle += 1
+            # Produce report of polled tables sorted by ascending nextPoll
+            by_nextPoll = [(tbl.nextPoll, tbl, tbl_name) for t_name, tbl in tables.itens()]
+            by_nextPoll.sort()
+            for nxt_poll, tbl, tbl_name in by_nextPoll:
+                print(f"{my_name}{tbl.lastId:12}, ", end='')
+                print(','.join("{:>20}".format(strfTime(t) if isinstance(t, str) and t != '0' or t > 0 else '-')
+                    for t in (tbl.minSec, tbl.maxTime, tbl.nextPoll, tbl.startPoll)), end='')
+                secs = anyToSecs(tbl.maxTime)
+                hours = int((time() - secs) / 3600) if secs is not None and secs != 0.0 else ''
+                print(f",{int(tbl.recordsPerHour):8},{hours:4}, {tbl.tableName}")
 
-        # Check for pending shutdown here -- not implemented
+        # Check for pending shutdown here, if daemon were implemented
 
         # Select highest priority table by (1)overdue poll then (2)min nextPoll time
         tbl: Union[Table, None] = None
@@ -163,13 +168,14 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
             return
         delta = tbl.nextPoll - time()
         if delta > 0 and loopForever:  	# sleep except for single table
-            # Update daemon status here -- not implemented
+            # Update daemon status here, if daemon were implemented
             if args.verbose > 0:
                 print(f"{my_name} Sleeping {int(delta)} seconds", end=' ', flush=True)
+            sys.stdout.flush()
             sleep(delta)  			# Sleep until requested poll time
             if not real_time:
                 Pager.timeScale = Pager.timeScaleSave  # Caught-up. Restore batch size
-        # Update daemon status -- not implemented in this version
+        # Update daemon status, if daemon were implemented
 
         # Collect requested records and write to csv file stamped with epochMillis
         tbl.polledTime = time()
@@ -177,12 +183,15 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
         file_name = os.path.join(outputPath,
             f"{str(int(1000 * tbl.polledTime))}_{tbl.tableName}{version}")
         printIf(True, f"{my_name}Collecting {file_name} ", end='')
-        check = tbl.polledTime - tbl.checked_time > 24 * 60 * 60
-        if check and tbl.tableName == 'ClientDetails':
-            tbl.minSec = 0		# occasionally get all, not just updated, records
+        # check table's fields and enums if not checked in the last 24 hours
+        occasional = 1 if tbl.polledTime - tbl.checked_time > 24*60*60 else 0
+        if occasional and tbl.tableName == 'ClientDetails':
+            tbl.minSec = 0 	# occasionally get all, not just the updated, records
 
         # initialize for check_fields and field_report
-        check_fields_init(tbl, check or args.fields, check or args.enums)
+
+        check_fields_init(tbl, 2 if args.fields == 2 else occasional*args.fields,
+                          2 if args.enums == 2 else occasional*args.enums)
 
         tbl.open_writer(file_name)  	# open table DictWriter; write header record
         for name in tbl.subTables:  	# for each sub_table ...
@@ -191,7 +200,9 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
             if len(sub_table.select) == 0:  # ... any fields defined to be output?
                 continue  				# No. So don't open an output file
             sub_table.open_writer(tbl.file_name + '_' + name)  # Open its DictWriter
-            check_fields_init(sub_table, check or args.fields, check or args.enums)
+            check_fields_init(sub_table,
+                              2 if args.fields == 2 else occasional*args.fields,
+                              2 if args.enums == 2 else occasional*args.enums)
         first_rec = True
         first_time = lastTime = None  	# init for case that table has <2 records
         if real_time:					# Am I the priority collector?
@@ -219,17 +230,14 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
                     tbl.writer.writerow(flat)
                 check_fields(tbl, flat)
         except (ConnectionAbortedError, ConnectionError, ConnectionRefusedError) as e:
-            # ClientDetails API spuriously returns a 500 error code that stops the collection.
-            # However, the data to this point is good. Accept the data as OK and move on.
-            if not (tbl.tableName == 'ClientDetails' and tbl.recCnt > 0):  # ***** when Cisco fixes
-                success = False  # collection failed. Will close, but not rename output
+            success = False  # collection failed. Will close, but not rename output
             logErr(f"{my_name}{e} reading {tbl.tableName}")
             tbl.nextPoll = time() + 4*60*60  # wait 4 hours before trying again
         if real_time:					# Am I the priority collector?
             sleep(Cpi.windowSize) 		# Yes. age-out my Cpi's activity.
             semaphore.release()			# release the low-priority collector
         # When reading has completed: report, close, and rename the output
-        if tbl.check_fields or tbl.check_enums:
+        if tbl.sample_fields > 0 or tbl.sample_enums > 0:
             an_err, results = field_report(tbl, args.check_verbose)
             if an_err:
                 logErr(results)
@@ -268,7 +276,7 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
             except ZeroDivisionError:  # change in time was zero
                 new_RPH = tbl.recordsPerHour  # default if we no change in timeFields
         printIf(args.verbose > 0,
-                f"{my_name}{tbl.recCnt} records processed. lId={tbl.lastId}, lS={strfTime(tbl.minSec)},",
+                f"{my_name}{tbl.recCnt:,} records processed. lId={tbl.lastId}, lS={strfTime(tbl.minSec)},",
                 f"mS={strfTime(tbl.maxTime)}, nP={strfTime(tbl.nextPoll)}", end=' ')
         if args.verbose > 0 and new_RPH != tbl.recordsPerHour:
             print(f"rph: {int(tbl.recordsPerHour)}-->{int(new_RPH)}")
@@ -279,7 +287,7 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
         tbl.recordsPerHour = new_RPH
 
         tbl.close_writer('part' if real_time else 'csv', rename=success)  # close & rename file extn
-        if check:				# This the periodic checking of fields and enums?
+        if occasional:				# This the periodic checking of fields and enums?
             tbl.checked_time = tbl.polledTime  # Yes. Done for another day
 
         # report, close, and rename each of the subTables' output files
@@ -287,7 +295,7 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
             sub_table: SubTable = tbl.subTables[name]
             if len(sub_table.select) == 0:  # any fields Selected for output?
                 continue  				# No. So no file was opened.
-            if args.fields or args.enums:
+            if sub_table.sample_fields > 0 or sub_table.sample_enums > 0:
                 an_err, results = field_report(sub_table, args.check_verbose)
                 if an_err:
                     logErr(results)
@@ -297,27 +305,23 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
         # A collection completed.
         if not args.single:  			# not --single
             write_state('realtime.json' if real_time else 'collect.json', tables)  # save state
+        sys.stdout.flush()
 
 
 def field_report(sub_table: SubTable, verbose: int) -> tuple:
     """Report each field that is extra, missing, undefined or type/value mis-matched
 
-    Parameters:
-        sub_table (SubTable):	table to report
-        verbose (int):			True to report all counts
-
-    Returns:
-        (error, str,)			(True if report found error(s), report string)
+    :param sub_table:   table to report
+    :param verbose:     True to report all counts
+    :return: (error, str,)	(True if report found error(s), report string)
     """
     def details(enum: bool, defined: object, findings: dict) -> tuple:
         """Report details for a single attribute
 
-        Parameters:
-            enum (bool):		True if this is an ENUM; otherwise False
-            defined (object):	{name:index, ...} if ENUM else type(expected data)
-            findings (dict):	{(value if ENUM else class):count, ...}
-        returns:
-            (error, str):	(True iff error(s), details string,)
+        :param enum:        True if this is an ENUM; otherwise False
+        :param defined:     {name:index, ...} if ENUM else type(expected data)
+        :param findings:    {(value if ENUM else class):count, ...}
+        :return: (error, str):	(True iff error(s), details string,)
         """
         error = False
         v = []
@@ -375,12 +379,11 @@ def flatten(tree: dict, result: dict, table: Table, path: str = ''):
     On the way back up, write each record in the list as a table_things record
     and do not include in the flattened results
 
-    Parameters:
-        tree (dict):	input tree of dict
-        result (dict):	output flattened dict
-        table (SubTable):	Table defining the fields and sub_tables
-        path (str):		pathname to top of the tree
 
+    :param tree:    input tree of dict
+    :param result:  output flattened dict
+    :param table:   Table defining the fields and sub_tables
+    :param path:    pathname to top of the tree
     """
     # first, process each simple element, because it might be a name
     for key in tree:
@@ -453,12 +456,10 @@ def flatten(tree: dict, result: dict, table: Table, path: str = ''):
 
 
 def write_state(file_name: str, tables: dict):
-    """Writes all table's dynamic state variables to a JSON file
+    """Write all tables' dynamic state variables to a JSON file
 
-    Parameters:
-        file_name (str):	file_name to write JSON-encoded state
-        tables (dict):		{tableName:table, ...}
-
+    :param file_name:   file_name to write JSON-encoded state
+    :param tables:      {tableName:table, ...}
     """
     state = dict()
     for key in tables:				# collect state of each table_name in production
@@ -471,11 +472,10 @@ def write_state(file_name: str, tables: dict):
 
 
 def read_state(file_name: str, tables: dict):
-    """Sets the dynamic state attributes in table from a json file
+    """Sets all tables dynamic state variables from a json file
 
-    Parameters:
-        file_name (str):		file_name of json-encoded state
-        tables (dict):		{tableName: table, ...}
+    :param file_name:   file_name of json-encoded state
+    :param tables:      {tableName: table, ...}
     """
     try:
         with open(file_name, 'r') as json_file:
@@ -513,10 +513,12 @@ parser.add_argument('--checkVerbose', action='store_true', dest='check_verbose',
     default=False, help="turn on detailed field checking reporting")
 parser.add_argument('--enum', action='store_true', default=False,
                     help='output all ENUM DDL')
-parser.add_argument('--enums', action='store_true', default=False,
-                    help='Check values of each ENUM field.')
-parser.add_argument('--fields', action='store_true', default=False,
-                    help='Check records for missing, unknown or mis-typed fields.')
+parser.add_argument('--enums', action='count', default=0,
+                    help="Count of each ENUM value: {never, once daily every n'th record, always}")
+parser.add_argument('--exclude', action='append', default=[],
+                    help="exclude table. Use multiple --exclude to exclude multiple tables")
+parser.add_argument('--fields', action='count', default=0,
+                    help="Count missing, unknown or mis-typed field {never, once daily every n'th record, always}.'")
 parser.add_argument('--hive', action='store_true', default=False,
                     help='output Hive data definition for selected table')
 parser.add_argument('--password', action='store', default=None,
@@ -543,19 +545,33 @@ parser.add_argument('--verbose', action='count', default=0,
                     help="diagnostic messaging level")
 args = parser.parse_args()
 
-if len(args.table_name) > 0:			# provided specific table names?
-    for tn in args.table_name:
-        if tn not in production:		# not normally a production table?
-            tbl = find_table(tn, all_table_dicts, args.ver)
-            if tbl is not None:			# However, have a definition for the table?
-                print(f"{tn} definition added for this job")  # Yes
-                add_table(production, tbl)  # add table to production for this job
-            else:
-                print(f"table {tn} is not defined")
-    to_ignore = [tn for tn in production if tn not in args.table_name]  # Yes.
-    # Reduce wait times when catching-up on fewer tables
-    # Fewer files in parallel * less total impact
-    Pager.catchup = Pager.catchup*(1+len(production)-len(to_ignore))/len(production)**2
+modules = ['charset-normalizer', 'filelock', 'idna', 'jmespath', \
+           'platformdirs', 'python-dateutil', 'pytz', 'requests', 'six', \
+           'type-extensions', 'typing_extensions', 'urllib3']
+lst = [(mn, module) for mn, module in sys.modules.items()]
+lst.sort()
+for mn, module in lst:
+    ver = getattr(module, '__version__', 'unknown')
+    print(mn, ver)
+sys.exit()
+len_production = len(production)
+for tn in args.table_name:              # add each table explicitly requested
+    if tn not in production:		    # not normally a production table?
+        tbl = find_table(tn, all_table_dicts, args.ver)
+        if tbl is not None:			    # However, have a definition for the table?
+            print(f"{tn} definition added for this job")  # Yes
+            add_table(production, tbl)  # add table to production for this job
+        else:
+            print(f"table {tn} is not defined")
+for tn in args.exclude:         # remove each table to be excluded from collection
+    if tn in production:
+        del production[tn]
+    if tn in args.table:
+        del args.table[tn]
+to_ignore = [tn for tn in production if tn not in args.table_name]  # Yes.
+# Reduce wait times when catching-up on fewer tables
+# Fewer files in parallel * less total impact
+Pager.catchup = Pager.catchup*(1+len(production))/len_production**2
 
 if args.SQL or args.hive:				# output table definitions?
     for table_name in args.table_name:
@@ -578,7 +594,7 @@ if args.enum:
 outputPath = args.directory
 if args.password is None:				# No password provided?
     try:
-        cred = credentials.credentials(args.server, args.username)
+        cred = credentials(args.server, args.username)
     except KeyError:
         print(f"No username/password credentials found for {args.server}")
         sys.exit(1)
