@@ -568,8 +568,8 @@ for tn in args.table_name:              # add each table explicitly requested
 for tn in args.exclude:         # remove each table to be excluded from collection
     if tn in production:
         del production[tn]
-    if tn in args.table:
-        del args.table[tn]
+    if tn in args.table_name:
+        del args.table_name[tn]
 to_ignore = [tn for tn in production if tn not in args.table_name]  # Yes.
 # Reduce wait times when catching-up on fewer tables
 # Fewer files in parallel * less total impact
