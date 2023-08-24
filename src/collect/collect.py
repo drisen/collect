@@ -134,8 +134,8 @@ def collect(tables: dict, real_time: bool = False, semaphore: threading.Semaphor
             print(f"\n{my_name}{'lastId':>12},{'minSec':>20},{'maxTime':>20},"
             + f"{'nextPoll':>20},{'startPoll':>20}, recs/Hr, Hrs, tableName")
             # Produce report of polled tables sorted by ascending nextPoll
-            by_nextPoll = [(tbl.nextPoll, tbl, tbl_name) for t_name, tbl in tables.itens()]
-            by_nextPoll.sort()
+            by_nextPoll = [(tbl_lst[0].nextPoll, tbl_lst[0], tbl_name) for tbl_name, tbl_lst in tables.items()]
+            by_nextPoll.sort(key=lambda x: [x[0], x[2]])
             for nxt_poll, tbl, tbl_name in by_nextPoll:
                 print(f"{my_name}{tbl.lastId:12}, ", end='')
                 print(','.join("{:>20}".format(strfTime(t) if isinstance(t, str) and t != '0' or t > 0 else '-')
@@ -548,12 +548,14 @@ args = parser.parse_args()
 modules = ['charset-normalizer', 'filelock', 'idna', 'jmespath', \
            'platformdirs', 'python-dateutil', 'pytz', 'requests', 'six', \
            'type-extensions', 'typing_extensions', 'urllib3']
+"""
 lst = [(mn, module) for mn, module in sys.modules.items()]
 lst.sort()
 for mn, module in lst:
     ver = getattr(module, '__version__', 'unknown')
     print(mn, ver)
 sys.exit()
+"""
 len_production = len(production)
 for tn in args.table_name:              # add each table explicitly requested
     if tn not in production:		    # not normally a production table?
