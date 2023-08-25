@@ -9,6 +9,7 @@ cpiapi.production and write each sample to ./files
 from argparse import ArgumentParser
 from collections import defaultdict
 import json
+import os
 import pprint
 import os
 import sys
@@ -594,6 +595,8 @@ if args.enum:
     sys.exit(0)
 
 outputPath = args.directory
+if not os.path.isdir(outputPath):       # Destination directory is missing?
+    os.mkdir(outputPath)                # Yes. Create it
 if args.password is None:				# No password provided?
     try:
         cred = credentials(args.server, args.username)
