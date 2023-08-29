@@ -117,7 +117,8 @@ def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float 
             raise ValueError(f"Unknown --band {b}. Specify one of {bands}")
 
     regex_string = name_regex           # remember un-compiled string
-    name_regex = re.compile(name_regex, flags=re.I)  # compile now for error-check
+    if name_regex is not None:
+        name_regex = re.compile(name_regex, flags=re.I)  # compile now for error-check
 
     try:
         username, password = credentials(server, username)
