@@ -497,7 +497,7 @@ if __name__ == '__main__':
     parser.add_argument('--allchannels', action='store_true', default=False,
                         help="Include noise from all channels in band. Default: co-channel only")
     parser.add_argument('--band', action='append',
-                        choices=('2.4', '5.0', 'all'), default='5.0',
+                        choices=('2.4', '5.0', 'all'),
                         help="enter each band to analyze: 2.4, 5.0, and/or 6.0. (default=5.0)")
     parser.add_argument('--age', action='store', type=float, default=5.0,
                         const=0.0, nargs='?',
