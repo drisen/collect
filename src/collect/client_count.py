@@ -356,10 +356,11 @@ else:  # No. Reading from collect's local files
         """
         return row['macAddress']['octets']  # from raw AccessPointDetails API record
 
+
     # get a directory list of files compressed yesterday noon
-    file_names = os.listdir(gz_path)
+    file_names = os.listdir(gz_path) if os.path.isdir(gz_path) else []
     # extend with a directory list of files collected since noon yesterday
-    file_names.extend(os.listdir(csv_path))
+    file_names.extend(os.listdir(csv_path) if os.path.isdir(csv_path) else [])
     file_names.sort()  					# sort ascending by time_stamp then file_name
     # if args.verbose:
     # 	print(f"will examine {', '.join(file_names)}")

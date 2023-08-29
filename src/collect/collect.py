@@ -24,7 +24,14 @@ from mylib import anyToSecs, credentials, strfTime, logErr, printIf, verbose_1
 TAU = 20 			# time-constant for recordsPerHour learning. Samples or Days
 sampling = [-1, 20, 1]  # initialize down-counter to sample [no, nth, every] record
 """ To do
-- implement ``--exclude`` option to exclude selected table from collection
+When collection from an API is far behind, it scheduled another poll for a time in the past
+that is prior to other nextPolls.
+If its next scheduling time fails to advance, then other APIs do not get a chance.
+To facilitate progress on all APIs, nextPoll must exponentially advance toward an hour in the future.
+  nextPoll = max(preferred nextPoll, (prevNextPoll+now)/2 + 1hour)
+  i.e. the first nextPoll is the preferred (possibly in the past)
+  e.g. nextPoll 60 years in the past will advance to the present in 19 steps
+
 - in HistoricalRF*, the collectionTime is corrected and output in csv with +0400 offset.
     Sample done at 2019-10-01-T20:32 contains data for up to 2019-10-02-T04:20:30+0400.
     This is not impossible since it is almost 60 minutes before sample time, because EDT is -0500.
