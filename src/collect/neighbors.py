@@ -80,7 +80,7 @@ def mwatt(dbm: int) -> float:
 
 
 def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float = 5.0,
-              allchannels: bool = False, band: list = ['5.0'].copy,
+              allchannels: bool = False, band: list = ['5.0'].copy(),
               csv_format: bool = False, full: bool = False,
               infile: Union[str, None] = None, maxConcurrent: int = 10,
               name_regex: Union[str, None] = None,
@@ -207,7 +207,7 @@ def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float 
                 if not (AP['model'].startswith('C9120') and radio['slotId'] == 6 and rec['radioType'] == 'Unknown'):
                     print(f"{rec['apName']}.{radio['slotId']} {rec['radioType']} {rec['radioRole']} "
                           + f"is {AP['model']} w/bad RadioDetails.channelNumber={channelNumber}")
-                continue                # ignore a radio with e.g 'Unknown' channel number
+                continue                # ignore a radio with e.g Unknown channel number
         slotId = radio['slotId']
         radio['channelNumber'] = channelNumber
         radio['noise'] = 0.0			# 0.0 mw of initial noise
