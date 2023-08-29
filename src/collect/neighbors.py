@@ -80,7 +80,7 @@ def mwatt(dbm: int) -> float:
 
 
 def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float = 5.0,
-              allchannels: bool = False, band: list = ['5.0'].copy(),
+              allchannels: bool = False, band: Union[list, None] = None,
               csv_format: bool = False, full: bool = False,
               infile: Union[str, None] = None, maxConcurrent: int = 10,
               name_regex: Union[str, None] = None,
@@ -110,7 +110,9 @@ def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float 
     """
 
     # verify and convert arguments to internal form
-    for b in band:
+    if not band:                        # set default value if no value(s) given
+        band = ['5.0']
+    for b in band:                      # verify all bands are known
         if b not in bands:
             raise ValueError(f"Unknown --band {b}. Specify one of {bands}")
 
