@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: collect
-Version: 2.0.9
+Version: 2.0.11
 Summary: Applications to collect and report statistics from the CPI APIs
 Author-email: Dennis Risen <dar5@case.edu>
 License:                     GNU GENERAL PUBLIC LICENSE
@@ -634,6 +634,11 @@ Classifier: Operating System :: Unix
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
+Requires-Dist: boto3>=1.21
+Requires-Dist: awslib@ git+https://github.com/drisen/awslib
+Requires-Dist: cpiapi@ git+https://github.com/drisen/cpiapi
+Requires-Dist: mylib@ git+https://github.com/drisen/mylib
+Requires-Dist: timeMachine@ git+https://github.com/drisen/timeMachine
 
 # collect package
 Applications that collect and process statistics from CPI

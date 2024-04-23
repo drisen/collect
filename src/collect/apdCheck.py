@@ -3,8 +3,18 @@
 # apdCheck.py Copyright (C) 2018 Dennis Risen, Case Western Reserve University
 #
 """
-Read access point definitions from AccessPointDetails API, and check
-for syntactically valid mapLocation information
+Applications such as E911, wireless design, and in-the-field maintenance require
+accurate maplocation information. However, manual data entry processes introduce
+omissions and errors; and sloppy data handling in CPI causes inconsistencies
+between the different non-normalized views of the same data.
+This apdCheck application checks for and reports decidable (e.g. missing and syntax)
+data entry errors in the AccessPointDetails location data.
+
+When data entry aspects are substantiality under control, extensions to this program
+can inform the identification, correction, and mitigation of data management
+practices that have created disconnects between e.g.
+- equivalency between maplocation in AccessPointDetails, Sites, and ServiceDomains.
+- AP name in RadioDetails vs name in AccessPointDetails
 """
 
 from argparse import ArgumentParser

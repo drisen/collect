@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "collect"
-version = "2.0.9"
+version = "2.0.11"
 authors = [ { name="Dennis Risen", email="dar5@case.edu" }, ]
 description = "Applications to collect and report statistics from the CPI APIs"
 readme = "README.md"

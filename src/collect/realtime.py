@@ -15,10 +15,26 @@ import statistics
 from cpiapi import Cpi
 from mylib import credentials, logErr, printIf
 """
-The service-provider layer for application(s) that provide realtime
-advice based on the number of people (actually client devices) in a Wi-Fi
-cell zone.
-Currently broken, in transition from a working proof-of-concept.
+The service-provider layer for application(s) that provide clients with realtime
+advice based on the number of people in a Wi-Fi cell zone.
+E.g. number of people waiting in line at the cafeteria or in the gym.
+Uses the number of client devices as a proxy.
+
+realtine.py's command-line parameters define a set of named AP zones to
+be monitored, with each zone listing the APs to be included in the zone.
+Every `seconds` seconds, the application polls the API `table` (e.g. ClientCounts)
+filtered by the union of the set of required APs, and appends a new timestamped
+summary record to the csv file for each named zone. Daily (e.g. at an early
+morning hour) realtime.py re-writes and renames each output csv, omitting records
+prior to midnight.
+Each client application has read-only access to the directory containing the
+csv files.
+
+A working prototype delivered a data stream to a single application.
+Began work to transition to a service usable by multiple applications, but
+put development on hold pending priority for such services. I.e. this code
+is half-baked.
+ 
 """
 
 ''' To do
@@ -26,6 +42,8 @@ Save current sample for each group.
 If the current sample is identical to the previous, drop it w/o outputting it.
 Recover if error when writing. Either create new file with version number,
 or drop this sample w/ logging to log.
+flush output file
+Daily truncate
 
 '''
 

@@ -1,4 +1,3 @@
 collect
 daemon
-decorate
 id_fix

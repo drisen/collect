@@ -1,4 +1,5 @@
 # This file is /usr/lib/systemd/system/ncsstats.service
+# sketch for potential Collect daemon
 [Unit]
 Description=Collect statistics from Cisco Prime Infrastructure
 #Documentation= http://...

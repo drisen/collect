@@ -1,6 +1,6 @@
 """
 This is a draft of an alternate factoring of scheduling polling jobs that allows
-multiple concurrent instances of the collect.py application.
+more frequent polling of data through multiple concurrent instances of the collect.py application.
 JobScheduler instances coordinate through a shared schedule file.
 
 Each application submits the tables to be polled to its JobScheduler instance.
@@ -11,6 +11,8 @@ status of the downloading.
 
 Implementation will require testing and verification of the JobScheduler, then
 replacing collect.py's job scheduling with JobScheduler.
+Not implemented because the performance of successive releases of Cisco's CPI software
+dramatically declined such that more frequent sampling could not be supported.
 
 """
 import io

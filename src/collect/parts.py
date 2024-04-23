@@ -2,8 +2,13 @@
 # parts.py Copyright (C) 2020 Dennis Risen, Case Western Reserve University
 #
 """
-Aggregates multiple nnn_tablename.part files produced by collect_c[ds]
-into a single nnn_tablename.csv file and deletes the nnn_tablename.parts.
+Deprecated by changing collect_cd.py and collect_cs.py to frequently flush their
+output to larger files.
+
+Reduces the number of realtime clientDetails and clientSessions sample files to be
+stored in S3, by aggregating multiple (e.g. one day of) small nnn_tablename.part files
+produced by collect_c[ds] into a single nnn_tablename.csv file for tablename,
+and deleting the nnn_tablename.parts.
 """
 
 from collections import defaultdict

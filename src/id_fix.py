@@ -6,8 +6,9 @@ import gzip
 from os import listdir, path
 from re import fullmatch
 """
-Correct for 2020-01-23 reset of event_seq in ncs01.case.edu Oracle database by adding
-at least 1,026,181,420 - 90,477,778 = 935,703,642 to each record since the reset.
+Correct for 2020-01-23 reset of event_seq in the ncs01.case.edu Oracle database
+by adding at least 1,026,181,420 - 90,477,778 = 935,703,642 to each record since
+the reset.
 """
 
 source_dir = r'C:\Users\dar5\Google Drive\Case\PyCharm\collect\events_prod\events'

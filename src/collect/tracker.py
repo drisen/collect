@@ -2,12 +2,29 @@
 # Copyright (C) 2020 Dennis Risen, Case Western Reserve University
 #
 """
-Uses ClientSessions join ClientDetails API real-time data collection of client
-device associations to APs stored in AWS S3 to calculate estimated
-[infection] exposure risks by AP cell and individual user.
+Working application prototype that provides infectious disease risk
+statistics, and assists in infectious disease tracking using WiFi-connected
+devices' AP-associations as a proxy for each user's location.
+Calculates exposure risk by user as the integral of the product of time and
+number of other users in the same cell.
+Calculates an exposure risk metric for each cell as the integral of the product of
+time and squared number of concurrent users in the cell.
 Writes a csv report of the top risks by location and user.
-Assists exposure tracking by producing a report of an individual users
-location over time.
+
+Assists tracking other's exposure by infected individuals by producing a report
+of selected individual users' location over time. Tracking is limited when
+a device's user is unknown due to both association to SSID which dos not require
+individual authentication the device's use of randomized MAC.
+Access to users' location must be carefully restricted and only available when
+health and safety gains clearly warrant the privacy loss.
+
+Uses ClientSessions join ClientDetails API real-time data collection of client
+devices' associations to APs, stored in AWS S3.
+Location resolution is limited by cell size and client devices' poor choice of
+the closest AP. Could be improved using extra-cost triangulation techniques.
+Time resolution is limited only being able to poll the state of all APs.
+Pushing only each association change would provide time resolution of a few
+as well as being dramatically more efficient.
 """
 
 from argparse import ArgumentParser
@@ -34,9 +51,10 @@ Desk audit w comments of values of each field
 histo_report: verify formula
 Input advice on device ownership and classification
 Obtain device details from ClientDevices
-Organize to re-use module as an input source to the wirelessMap application
+Organize to re-use module as an input source for visualization by the
+wirelessMap GUI application
 Update to use the newer ServiceDomain API, instead of the sites API
-Measure and tune performance to facilitate use as a Source
+Measure and tune performance to facilitate use as a Source to wirelessMap.
 """
 do_not_backup = r'C:\Users\dar5\Downloads\DoNotBackup'
 tm_path = do_not_backup+r'\awsstuff\prod'  # path to timeMachines

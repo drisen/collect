@@ -3,7 +3,17 @@
 # neighbors.py Copyright (C) 2019 by Dennis Risen, Case Western Reserve University
 #
 """
-function and application to report, for each AP slot slot, the co-channel noise from neighboring APs
+The `neighbors()` function writes a report of the AP inventory to a file,
+and optionally writes a report to another file of: for each AP slot slot,
+the total and contributing co-channel noise from the top neighboring APs.
+Reports may be generated in csv or more human-readable format,
+and may be filtered by band and AP name pattern.
+
+The data may come from realtime multi-threaded polling of the rxNeighbors API,
+or from an existing rxNeighbors.csv file.
+
+When neighbors.py is run as the main program, it accepts appropriate parameters
+and calls the neighbors() function with these parameters.
 """
 """ To Do
 Extend to process 6GHz channels too
@@ -20,15 +30,75 @@ from typing import Union
 from cpiapi import all_table_dicts, Cpi, Cache
 from mylib import credentials, printIf, secsToMillis, strfTime, verbose_1
 
-# pairs maps channelNumber to the lower channel of a 40MHz channel pair
+
+class Chan:
+    """ A WiFi channel"""
+    def __init__(self, width, *subChannels):
+        """Define a WiFi channel
+
+        :param width:       channel width in MHz
+        :param subChannels: list of sub-channels
+        """
+        self.width = width
+        self.subChannels = subChannels
+
+    def __str__(self):
+        return f"Chan({self.width}, {self.subChannels})"
+
+
+b40 = Chan(40)                          # 40MHz channel with no sub-channels
+bonding = {'2.4': {i: Chan(20, i-2, i-1, i, i+1) for i in range(1, 11+1)},
+           '5.0': {
+               # 40MHz channels
+               36: b40, 40: b40, 44: b40, 48: b40,  # U-NII-1
+               52: b40, 56: b40, 60: b40, 64: b40,   # U-NII-2A
+               # U-NII-2B are not allocated for WiFI use
+               68: b40, 72: b40, 76: b40, 80: b40, 84: b40,  # U-NII-2B
+               88: b40, 92: b40, 96: b40,  # U-NII-2B
+               100: b40, 104: b40, 108: b40, 112: b40, 116: b40,  # U-NII-2C
+               120: b40, 124: b40, 128: b40, 132: b40, 136: b40,  # U-NII-2C
+               140: b40,                # U-NII-2C
+               144: b40,                # U-NII 2C/3
+               149: b40, 153: b40, 157: b40, 161: b40, 165: b40,  # U-NII-3
+               169: b40,                # U-NII-3/4
+               173: b40, 177: b40,      # U-Nii-4
+               # 80MHz channels
+               42: Chan(80, 38, 46), 58: Chan(80, 54, 62), 74: Chan(80, 70, 78), 90: Chan(80, 86, 94),
+               106: Chan(80, 102, 110), 122: Chan(80, 118, 126), 138: Chan(80, 134, 142),
+               155: Chan(80, 151, 159), 171: Chan(80, 167, 175),
+               # 160MHz channels
+               50: Chan(160, 42, 58), 82: Chan(160, 74, 90), 114: Chan(160, 106, 122), 163: Chan(160, 155, 171)
+           },
+           '6.0': {
+               2: Chan(20),
+               63: Chan(320, 47, 79), 127: Chan(320, 111, 143), 191: Chan(320, 175, 207)
+                   }
+           }
+for i in range(int((1-1)/4), int((233-1)/4)+1):
+    bonding['6.0'][4*i+1] = Chan(20, None, None)         # 20MHz U-NII-5 -- U-NII-8
+for i in range(int((3-3)/8), int((227-3)/8)+1):
+    bonding['6.0'][8*i+3] = Chan(40, 8*i+3-2, 8*i+3+2)  # 40MHz U-NII-5 -- U-NII-8
+for i in range(int((7-7)/16), int((215-7)/16)+1):
+    bonding['6.0'][16*i+7] = Chan(80, 16*i+7-4, 16*i+7+4)  # 80 MHz U-NII-5 -- U-NII-8
+for i in range(int((15-15)/32), int((207-15)/32) + 1):
+    bonding['6.0'][32*i+15] = Chan(160, 32*i+15-8, 32*i+15+8)  # 160MHz U-NII-5 -- U-NII-8
+for i in range(int((31-31)/64), int((159-31)/64) + 1):
+    bonding['6.0'][64*i+31] = Chan(320, 64*i+31-16, 64*i+31+16)  # 320MHz U-NII-5 -- U-NII-8
+
+
+# pairs maps a channelNumber to the lower channel of the containing 40MHz channel
 pairs = dict()
 for i in range(36, 148):
     pairs[i] = int((i-4)/8)*8+4
 for i in range(149, 165):
     pairs[i] = int((i-5)/8)*8+5
 pairs[165] = 165
-# lists each allowable band code and maps it a possibly different internal code
-bands = {'2.4': ['2.4'], '5.0': ['5.0'], '6.0': ['6.0']}
+# maps each allowable band code to its default slot number
+bands = {'2.4': 0, '5.0': 1, '6.0': 2}
+
+# Maximum number of noise sources to report per radio.
+# Defines entries in the csv header row, so do not change once in production
+maxcol = 32
 
 
 def dBm(mwatt: float) -> Union[int, float]:
@@ -99,7 +169,7 @@ def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float 
     :param full:        Include AP model suffix in model name
     :param infile:      Instead of polling, input from this filename,
     :param maxConcurrent maximum number of reader threads
-    :param name_regex:  Filter CPI GET for AP names that match this regex
+    :param name_regex:  Filter CPI for AP names that match this regex, ignoring case
     :param server:      CPI server name
     :param twenty:      Report specific 20 MHz channels, not 40 MHz pairs
     :param rxlimit:     Report only the neighbors with RSSI>rxlimit
@@ -112,14 +182,14 @@ def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float 
     # verify and convert arguments to internal form
     if not band:                        # set default value if no value(s) given
         band = ['5.0']
-    for b in band:                      # verify all bands are known
+    for b in band:                      # verify each requested  bands is known
         if b not in bands:
             raise ValueError(f"Unknown --band {b}. Specify one of {bands}")
 
     regex_string = name_regex           # remember un-compiled string
     if name_regex is not None:
-        name_regex = re.compile(name_regex, flags=re.I)  # compile now for error-check
-
+        # compile now for error-check. re.I flag to ignore case
+        name_regex = re.compile(name_regex, flags=re.I)
     try:
         username, password = credentials(server, username)
     except KeyError:
@@ -132,7 +202,7 @@ def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float 
     APById={APD.@id:AP, ...}			index to APs by apId
     APByMac={APD.macAddress_octets:AP, ...}	index to APs by MAC
     AP={'apId':APD.@id					CPI's unique @id:int for the AP
-        , 'radios:{'2.4 GHz':radio, '5.0 GHz':radio}
+        , 'radios:{'2.4 GHz':radio, '5.0 GHz':radio, '6.0 GHz':radio}
         , 'macAddress_octets':APD.macAddress_octets	base MAC:str of AP's radios
         , 'locationHierarchy':APD.locationHierarchy	'Case Campus > building > floor'
         , 'model':APD.model		        AP model number:str
@@ -406,18 +476,22 @@ def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float 
     printIf(verbose, "reporting results")
     # Report the results, sorted by apName
     lst = sorted((APById[apId]['name'].upper(), apId) for apId in APById)
+    # use narrower field widths when generating textual report for allchannels
     f_hdr = '{:18}{:>9}' + 8*('   neighbor '[(-10 if allchannels else -11):] + 'RSSI') + '\n'
     f_neighbor = '{:>' + str(10 if allchannels else 11) + '}{:4}'
     f_foreign = '{:>' + str(11 if allchannels else 12) + '}{:3}'
     if out is not None:
         if csv_format:					# csv output?
-            out.write(f"{'apName_slot, noise, '}{','.join(['neighbor'+str(i)+', RSSI'+str(i) for i in range(1,30)])}\n")
+            # output headers for maximum number of noise sources to report
+            out.write(f"{'apName_slot,totRSSI,'}"
+                      + f"{','.join(['neighbor'+str(i)+',RSSI'+str(i) for i in range(1,maxcol+1)])}\n")
         else:
             out.write(f_hdr.format(' AP name[.slot]', 'noise dbm'))
     for aband in band:
         for sortKey, apId in lst:
             AP = APById[apId]
             name = AP['name']			# get the possibly mixed-case name
+            # name_regex is compiled with I flag to ignore case
             if name_regex is not None and not name_regex.match(name):
                 continue				# ignore AP if name doesn't match the filter
             nameSplit = name.split('-')
@@ -425,66 +499,78 @@ def neighbors(inventory: str, neighbors_filename: str, outfile: str, age: float 
             qual = '-'.join(nameSplit[0:-2]).upper() if len(nameSplit) > 2 else None
             for slotId in AP['radios']:  # for each radio
                 radio = AP['radios'][slotId]  # the radio
-                theBand = '2.4' if radio['channelNumber'] <= 11 else '5.0'
+                theBand = '2.4' if radio['channelNumber'] <= 11 \
+                    else '5.0' if radio['channelNumber'] <= 165 else '6.0'
                 if aband != theBand:    # not the band that is being processed?
                     continue			# ignore this radio now
-                namecopy = name
-                if theBand == '2.4' and slotId != 0 or theBand == '5.0' and slotId != 1:
-                    namecopy += f".{slotId}"  # append unusual slotId to name
                 if out is not None:
                     if csv_format:		# csv output?
-                        out.write(f",{namecopy},{dBm(radio['noise'])}")
-                    else:				# text columns output
-                        out.write(f"{namecopy:23}{dBm(radio['noise']):4}")
+                        out.write(f"{name}.{slotId},{dBm(radio['noise'])}")
+                    else:				# No. text columns output
+                        name_slot = name
+                        if slotId != bands[theBand]:  # Unusual slotId for this band?
+                            name_slot += f".{slotId}"  # append unusual slotId to name_slot
+                        out.write(f"{name_slot:23}{dBm(radio['noise']):4}")
                 neighbors = radio['neighbors']
                 # sort neighbors by descending RSSI
                 n = sorted((-neighbors[i]['RSSI'], i) for i in range(len(neighbors)))
+                n = n[:maxcol]      # limit the number of noise sources reported
                 for negRSSI, i in n:
                     if -negRSSI < rxlimit:  # RSSI less than limit?
                         break			# yes, ignore all remaining in sorted list
                     neighbor = neighbors[i]
                     ApName = neighbor['ApName']
                     nslotId = neighbor['slotId']
-                    if theBand == '2.4' and nslotId != 0 or theBand == '5.0' and nslotId != 1:
-                        ApName += f".{slotId}"  # append unusual nslotId to ApName
                     nSplit = ApName.split('-')
                     if out is not None:
                         if csv_format:  # csv output?
-                            out.write(f",{ApName},{-negRSSI}")
+                            out.write(f",{ApName}.{nslotId},{-negRSSI}")
                         else:			# text columns output
-                            if '-'.join(nSplit[0:-2]).upper() == qual:  # neighbor has same?
+                            if nslotId != bands[theBand]:  # unusual slotId?
+                                ApName += f".{slotId}"  # Yes. Append unusual slotId to ApName
+                            # neighbor has same location?
+                            if '-'.join(nSplit[0:-2]).upper() == qual:
                                 ApName = '-'.join(nSplit[-2:])[(-9 if allchannels else -10):]
                                 out.write(f_neighbor.format(ApName, -negRSSI))  # only SER-WAP
-                            else:		# different qualifier
-                                ApName = ApName[(-10 if allchannels else -11):]  # last 10+ chars w/o spacing
+                            else:		# No. Different qualifier -> use last 10+ chars w/o spacing
+                                ApName = ApName[(-10 if allchannels else -11):]
                                 out.write(f_foreign.format(ApName, -negRSSI))
                 if out is not None:
-                    out.write('\n')
+                    out.write('\n')     # complete the record with a newline
     if out is not None:
-        out.write('\nA radio name has a ".slot#" suffix iff its slot is '
-            + 'non-default for the channel. e.g. the XOR radio operating in 5 GHz.\n')
-        out.write("Each neighbor column is the shortened neighbor name. ")
-        out.write("For a radio in the same building, the last 2 fields; otherwise the last "
-                  + str(10 if allchannels else 11) + " characters.\n")
-        out.write("For each radio:\n")
-        s = '' if allchannels else " co-channel"
-        out.write(f"    The RSSI reported for each{s} neighbor is the RSSI in dBm as seen by the radio\n")
-        out.write(f"    The noise dBm at the radio is {util}"
-            + "* the sum of each{s} neighbor RSSI reduced by its tx level. 0 mwatt --> nan dBm\n")
-        out.write(f"Reporting radios in the {' and '.join(band)} band(s)")
-        if name_regex is None:
-            out.write(".\n")
+        if csv_format:
+            # output each summary as an AP named $MetaData$-xxx
+            out.write(f"$MetaData$bands,{','.join(bands)}\n")
+            out.write(f"MetaData$regexFilter,{regex_string}\n")
+            out.write(f"$MetaData$rxLimit,{rxlimit}\n")
+            out.write(f"$MetaData$allChannels, {allchannels}\n")
+            out.write(f"$MeteData$unreachableCount,{len(unreachable)}\n")
+            out.write(f"$MetaData$noResponseCount,{len(unreachable)}\n")
         else:
-            out.write(f" with AP name that matches {regex_string}.\n")
-        out.write(f"Reporting rxNeighbors with RSSI greater than {rxlimit} dBm\n")
-        if len(unreachable) > 0:
-            out.write(f"APs {unreachable} were unreachable")
-        if len(names) > 0:
-            out.write(f"APs {names} didn't respond to a RxNeighbor status request.\n")
-        out.write(f"This report generated at {strfTime(time())}")
-        if infile is not None:
-            out.write(f", from data polled at {strfTime(sourceMsec)}")
-        out.write("\n")
+            # output textual meta data
+            out.write('\nA radio name has a ".slot#" suffix iff its slot is '
+                + 'non-default for the channel. e.g. the XOR radio operating in 5 GHz.\n')
+            out.write("Each neighbor column is the shortened neighbor name. ")
+            out.write("For a radio in the same building, the last 2 fields; otherwise the last "
+                      + str(10 if allchannels else 11) + " characters.\n")
+            out.write("For each radio:\n")
+            s = '' if allchannels else " co-channel"
+            out.write(f"    The RSSI reported for each{s} neighbor is the RSSI in dBm as seen by the radio\n")
+            out.write(f"    The noise dBm at the radio is {util}"
+                + "* the sum of each{s} neighbor RSSI reduced by its tx level. 0 mwatt --> nan dBm\n")
+            out.write(f"Reporting radios in the {' and '.join(band)} band(s)")
+            if name_regex is None:
+                out.write(".\n")
+            else:
+                out.write(f" with AP name that matches {regex_string}.\n")
+            out.write(f"Reporting rxNeighbors with RSSI greater than {rxlimit} dBm\n")
+            if len(unreachable) > 0:
+                out.write(f"{len(unreachable)} Unreachable APs: {unreachable}\n")
+            if len(names) > 0:
+                out.write(f"{len(names)} APs didn't respond to a RxNeighbor status request: {names}\n")
+            out.write(f"This report generated at {strfTime(time())}\n")
+            if infile is not None:
+                out.write(f", from data polled at {strfTime(sourceMsec)}\n")
         out.close()
 
 
@@ -500,7 +586,7 @@ if __name__ == '__main__':
     parser.add_argument('--allchannels', action='store_true', default=False,
                         help="Include noise from all channels in band. Default: co-channel only")
     parser.add_argument('--band', action='append',
-                        choices=('2.4', '5.0', 'all'),
+                        choices=('2.4', '5.0', '6.0'),
                         help="enter each band to analyze: 2.4, 5.0, and/or 6.0. (default=5.0)")
     parser.add_argument('--age', action='store', type=float, default=5.0,
                         const=0.0, nargs='?',
@@ -511,12 +597,12 @@ if __name__ == '__main__':
                         help="Include AP model suffix in model name")
     parser.add_argument('--infile', action='store', default=None,
                         help="input rxNeighbors.csv filename, instead of polling")
-    # CPI appears to now concurrently work on only maxConcurrent of the requests
-    # and queue the excess. Thus there is no speedup beyond keeping its queue non-empty
+    # CPI appears to concurrently work on only 5 of the requests and queue the excess.
+    # Thus, there is no speedup beyond 5 plus a couple to keep queue CPI's non-empty
     parser.add_argument('--maxConcurrent', action='store', type=int, default=10,
                         help="maximum number of reader threads.")
     parser.add_argument('--name_regex', action='store', default=None,
-                        help="filter CPI GET for AP names that match this regex.")
+                        help="filter AP names that match this regex, ignoring case.")
     parser.add_argument('--server', action='store', default="ncs01.case.edu",
                         help='CPI server name. default=ncs01.case.edu')
     parser.add_argument('--twenty', action='store_true', default=False,

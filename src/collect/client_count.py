@@ -2,11 +2,16 @@
 # client_count.py Copyright (C) 2020 Dennis Risen, Case Western Reserve University
 #
 """
-Produce csv reports, apClientCountsAuthYYYY-MM-DD and apClientCountsTotYYYY-MM-DD
-of the number of wireless clients associated with each AP
-in the listed buildings in each 30 minute interval.
-Range of dates is either the previous day (from CPI server)
-or the specified range of dates (from AWS S3).
+client_count provides metrics to inform managing concentrations of people.
+It produces csv report(s) of the number of wireless clients associated with
+each AP by day per `minutes` minute interval. The apClientCountsAuthYYYY-MM-DD
+and apClientCountsTotYYYY-MM-DD reports respectively report authenticated and
+all associations.
+If given one or more `name`, it reports only on those AP names which start with
+one of the `name`.
+If given a `min_date` to `max_date` range, it reads and reports per data AWS S3.
+Otherwise, it reports the previous day's data and compressed data from the
+files and files/copied directories, and emails the reports to the supplied `email` addressees.
 
 """
 import cpiapi

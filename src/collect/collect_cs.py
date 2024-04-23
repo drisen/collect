@@ -2,7 +2,7 @@
 # collect_cs.py Copyright (C) 2021 Dennis Risen, Case Western Reserve University
 #
 """
-Polls the CPI ClientSessions API in real-time, writing its most significant fields
+Polls CPI's ClientSessions API in real-time, writing its most significant fields
 to time-stamped NNNNNNNNNN_ClientSessionsv4.csv files in the collect_cs sub-directory.
 It starts a new file every N hours, and keeps a collection status in collect_cs.json
 to facilitate appending only the new polls.
@@ -16,7 +16,7 @@ import time
 import cpiapi
 from mylib import credentials, logErr
 """ To Do
-- Fix the poller. After an initial read through 8 x 1000001 records, it repeatedly
+- Fix the CPI database. After an initial read through 8 x 1000001 records, it repeatedly
 sleeps 299 seconds and reads nothing
 """
 

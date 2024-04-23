@@ -2,7 +2,6 @@ LICENSE
 README.md
 pyproject.toml
 src/daemon.py
-src/decorate.py
 src/id_fix.py
 src/collect/apdCheck.py
 src/collect/client_bands.py

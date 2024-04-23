@@ -4,6 +4,7 @@
 
 """
 Report the clientSessions for client associations with APs during time window
+Not fully debugged due to persistent failure of the required CPI APIs.
 """
 from argparse import ArgumentParser
 from collections.abc import Sequence

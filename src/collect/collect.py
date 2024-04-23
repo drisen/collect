@@ -4,7 +4,7 @@
 #
 """
 Continuously collect statistics from CPI APIs that are listed in
-cpiapi.production and write each sample to ./files
+cpiapi.production, and write each sample to ./files
 """
 from argparse import ArgumentParser
 from collections import defaultdict
@@ -24,6 +24,9 @@ from mylib import anyToSecs, credentials, strfTime, logErr, printIf, verbose_1
 TAU = 20 			# time-constant for recordsPerHour learning. Samples or Days
 sampling = [-1, 20, 1]  # initialize down-counter to sample [no, nth, every] record
 """ To do
+Collection of ClientDetails slows after a few thousand records.
+Break up the collection into 5000 record chunks.
+
 When collection from an API is far behind, it scheduled another poll for a time in the past
 that is prior to other nextPolls.
 If its next scheduling time fails to advance, then other APIs do not get a chance.
@@ -517,6 +520,8 @@ def read_state(file_name: str, tables: dict):
 # Parse command line for arguments
 parser = ArgumentParser(description='Write statistics from CPI as csv files to directory')
 parser.add_argument('directory')
+parser.add_argument('--buggyAPI', action='store',
+                    help='name of API for extra diagnostic messages')
 parser.add_argument('--checkVerbose', action='store_true', dest='check_verbose',
     default=False, help="turn on detailed field checking reporting")
 parser.add_argument('--enum', action='store_true', default=False,
@@ -604,13 +609,13 @@ if args.enum:
 outputPath = args.directory
 if not os.path.isdir(outputPath):       # Destination directory is missing?
     os.mkdir(outputPath)                # Yes. Create it
-if args.password is None:				# No password provided?
-    try:
-        cred = credentials(args.server, args.username)
-    except KeyError:
-        print(f"No username/password credentials found for {args.server}")
-        sys.exit(1)
-    args.username, args.password = cred
+try:
+    args.username, args.password = credentials(args.server, args.username)
+except KeyError:
+    print(f"No username/password credentials found for {args.server}.{args.username}")
+    sys.exit(1)
+if args.buggyAPI:
+    Cpi.buggyApi = args.buggyAPI        # set API for more debugging information
 # The real_time and low_priority collect threads each have their own Cpi instance.
 # This allows the real_time to block the low_priority for the duration of each poll.
 semaphore = threading.Semaphore()		# for realtime to be able to block myCpi

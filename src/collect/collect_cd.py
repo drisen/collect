@@ -2,7 +2,7 @@
 # collect_cd.py Copyright (C) 2021 Dennis Risen, Case Western Reserve University
 #
 """
-Polls the CPI ClientDetails API in real-time, writing its most significant fields
+Polls CPI's ClientDetails API in real-time, writing its most significant fields
 to time-stamped NNNNNNNNNN_ClientBriefv4.csv files in the ./collect_cd directory.
 Every N hours, close and move the file to ./files and keep a collection status in collect_cd.json
 to facilitate appending only the new polls.

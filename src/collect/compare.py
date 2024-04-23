@@ -17,6 +17,15 @@ from cpiapi import all_table_dicts, find_table, numericTypes, SubTable, Table
 from mylib import strfTime, verbose_1
 
 """ TO DO
+When CPI is inserting, modifying, and deleting records while a collection
+process that is collecting the state of these records, the collection
+output is inherently indeterminate.
+The compare yields differences (such as listed below) that appear to be due
+to this indeterminance, not software bug(s).
+
+Add some heuristics to classify differences that are consistent with merely
+indeterminance.
+
 AccessPointDetail: 1st sample on laptop was started 297 seconds later --> some different results
     file transfer from server to laptop converts e accented with ' to A~ (c)  eg cafe'
 files\1586059800001_ClientDetailsv4 differences with prod\1586059800030_ClientDetailsv4.csv. file had 1 extra record

@@ -2,8 +2,19 @@
 # client_bands.py Copyright (C) 2021 Dennis Risen, Case Western Reserve University
 #
 """
-Read ClientDetails or ClientSessions csv[.gz] files and output a csv summary
-of each MAC's usage of the 802.11 bands and protocols
+Wireless clients do not necessarily select the AP and protocol that we would
+prefer. To what extent does this occur? What are the relevant predictors,
+and how might we better support more appropriate selection?
+
+This simple utility application to access utilization 802.11 band, protocol,
+and SSID by each client MAC. It outputs a csv summary of the number of times,
+that each client MAC has used a 802.11 band, protocol, and SSID.
+Pivoting on the data by other attributes could be facilitated by collecting
+interesting candidates such as building and AP type.
+
+Reads sessions data from the ClientDetails or ClientSessions csv.gz files in the
+'dir-path' directory with filenames matching `pat` and times between `min_time` and `max_time`.
+
 """
 from collections import defaultdict
 import csv
@@ -31,22 +42,22 @@ max_time = 0.0
 clientDetails = True
 if clientDetails:
     pat = r'.*_ClientDetailsv4\.csv(\.gz)?'
-    file_path = 'collect_cd'
+    dir_path = 'collect_cd'
     sum_filename = 'cd_summary.csv'
 else:
     pat = r'.*_ClientSessionsv4\.csv(\.gz)?'
-    file_path = 'collect_cs'
+    dir_path = 'collect_cs'
     sum_filename = 'cs_summary.csv'
 
 # process each csv[.gz] file
-for filename in os.listdir(file_path):
+for filename in os.listdir(dir_path):
     m = re.fullmatch(pat, filename)
     if not m:
         print(f"ignoring {filename}")
         continue
     print(f"processing {filename}")
-    with gzip.open(os.path.join(file_path, filename), 'rt') if m.group(1) == '.gz' \
-            else open(os.path.join(file_path, filename), 'rt', newline='') as cs_file:
+    with gzip.open(os.path.join(dir_path, filename), 'rt') if m.group(1) == '.gz' \
+            else open(os.path.join(dir_path, filename), 'rt', newline='') as cs_file:
         reader = csv.DictReader(cs_file)
         for rec in reader:
             mac_dict = clients[rec['macAddress']]  # dict for this mac
